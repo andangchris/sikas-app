@@ -60,7 +60,7 @@ let currentTunggakan = null;
 let fromPage     = "dashboard";
 
 // Pagination state per section
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 3;
 const pgState = {
   dashboard: { page: 1, data: [] },
   cari:      { page: 1, data: [] },
