@@ -2,7 +2,7 @@
    SiKAS — app.js (FINAL PERBAIKAN)
 ═══════════════════════════════════════════════ */
 
-const API_URL = "https://script.google.com/macros/s/AKfycbxcUpbCyoHBwObkdKksdhDwBzNAYgEvGawL4bKde5YY3lqeACGF3psIp6rahGMLrFJR/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbxNDn2u7mDYvW4lKeuKvGiTLEn6bG2zWREa1gWydZFx5d2s0q47GslB_Yz2P4KKIMVS/exec";
 
 const BULAN_LIST = ["Januari","Februari","Maret","April","Mei","Juni",
                     "Juli","Agustus","September","Oktober","November","Desember"];
