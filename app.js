@@ -104,6 +104,7 @@ function api(body) {
 // ════════════════════════════════════════════════════════════════════════
 //  LOGIN / LOGOUT
 // ════════════════════════════════════════════════════════════════════════
+/*
 async function doLogin() {
   const username = document.getElementById("inp-username").value.trim();
   const password = document.getElementById("inp-password").value;
@@ -123,6 +124,62 @@ async function doLogin() {
   } catch (err) { showErr("Gagal terhubung: " + err.message); }
   finally { btn.disabled = false; btn.textContent = "Masuk"; }
 }
+*/
+async function doLogin() {
+  const username = document.getElementById("inp-username")?.value.trim();
+  const password = document.getElementById("inp-password")?.value;
+  const btn = document.getElementById("btn-login");
+
+  if (!username || !password) {
+    showErr("Isi username & password");
+    return;
+  }
+
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Memverifikasi...";
+  }
+
+  try {
+    const res = await api({ action: "login", username, password });
+    console.log("Response login:", res);
+
+    if (res.status !== "ok") {
+      showErr(res.message || "Login gagal");
+      return;
+    }
+
+    const errBox = document.getElementById("login-err");
+    if (errBox) errBox.style.display = "none";
+
+    session = {
+      token: res.token,
+      nama: res.nama,
+      role: res.role,
+      username: res.username
+    };
+
+    sessionStorage.setItem("sikas_session", JSON.stringify(session));
+    clearCache();
+    startLogoutTimer();
+
+    showApp();
+
+    prefetchAnggota().catch(err => {
+      console.error("Prefetch anggota gagal:", err);
+    });
+
+  } catch (err) {
+    console.error("Login error:", err);
+    showErr("Gagal terhubung: " + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "Masuk";
+    }
+  }
+}
+
 function showErr(msg) {
   const el = document.getElementById("login-err");
   el.textContent = msg;
@@ -144,12 +201,32 @@ function doLogout() {
 // ════════════════════════════════════════════════════════════════════════
 //  NAVIGATION
 // ════════════════════════════════════════════════════════════════════════
+/*
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
   if (el) el.classList.add("active");
   window.scrollTo(0, 0);
 }
+*/
+
+function showPage(id) {
+  document.querySelectorAll(".page").forEach(page => {
+    page.classList.remove("active");
+  });
+
+  const targetPage = document.getElementById(id);
+
+  if (!targetPage) {
+    console.error("Halaman tidak ditemukan:", id);
+    return;
+  }
+
+  targetPage.classList.add("active");
+  window.scrollTo(0, 0);
+}
+
+/*
 function showApp() {
   const h = new Date().getHours();
   const greeting = h < 12 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam";
@@ -158,6 +235,36 @@ function showApp() {
   showPage("pg-dashboard");
   loadDashboard();
 }
+*/
+
+function showApp() {
+  if (!session?.token) {
+    showPage("pg-login");
+    return;
+  }
+
+  const h = new Date().getHours();
+  const greeting =
+    h < 12 ? "Selamat pagi" :
+    h < 15 ? "Selamat siang" :
+    h < 18 ? "Selamat sore" :
+    "Selamat malam";
+
+  const greetingEl = document.getElementById("dash-greeting");
+  const namaEl = document.getElementById("dash-nama");
+
+  if (greetingEl) {
+    greetingEl.textContent = greeting + ", " + (session?.role === "admin" ? "Admin" : "Petugas");
+  }
+
+  if (namaEl) {
+    namaEl.textContent = session?.nama || session?.username || "Pengguna";
+  }
+
+  showPage("pg-dashboard");
+  loadDashboard();
+}
+
 function goPage(page) {
   const map = { dashboard: "pg-dashboard", cari: "pg-cari", bayar: "pg-bayar", laporan: "pg-laporan" };
   showPage(map[page]);
