@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════
    SiKAS — app.js
    Sistem Iuran Kas & RMD
+   Dengan Cache 1 jam & Auto Logout 5 jam
 ═══════════════════════════════════════════════ */
 
 // ── CONFIG ───────────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ const TAHUN_INI  = new Date().getFullYear();
 // ── CACHE CONFIG ─────────────────────────────────────────────────────────
 const CACHE_KEY = "sikas_cache";
 const CACHE_EXPIRY = 60 * 60 * 1000; // 1 jam dalam milidetik
+let logoutTimer = null;
 
 // Fungsi untuk menyimpan ke cache
 function setCache(key, data) {
@@ -52,9 +54,9 @@ function clearCache() {
 
 // ── STATE ────────────────────────────────────────────────────────────────
 let session      = JSON.parse(sessionStorage.getItem("sikas_session") || "null");
-let allAnggota   = [];          // cached anggota list
-let currentAnggota = null;      // anggota di halaman detail
-let currentTunggakan = null;    // tunggakan untuk form bayar
+let allAnggota   = [];
+let currentAnggota = null;
+let currentTunggakan = null;
 let fromPage     = "dashboard";
 
 // Pagination state per section
@@ -67,20 +69,53 @@ const pgState = {
 };
 
 // ════════════════════════════════════════════════════════════════════════
+//  AUTO LOGOUT TIMER
+// ════════════════════════════════════════════════════════════════════════
+function startLogoutTimer() {
+  if (logoutTimer) clearTimeout(logoutTimer);
+  
+  logoutTimer = setTimeout(() => {
+    if (session?.token) {
+      showToast("⏰ Sesi berakhir setelah 5 jam, silakan login ulang", "warning");
+      doLogout();
+    }
+  }, 5 * 60 * 60 * 1000); // 5 jam
+}
+
+function resetLogoutTimer() {
+  if (logoutTimer) {
+    clearTimeout(logoutTimer);
+    startLogoutTimer();
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════════
 //  INIT
 // ════════════════════════════════════════════════════════════════════════
 window.onload = () => {
   if (session?.token) {
     showApp();
+    startLogoutTimer();
+    
+    // Reset timer saat user berinteraksi
+    const resetEvents = ["click", "keydown", "touchstart", "scroll", "mousemove"];
+    resetEvents.forEach(event => {
+      document.addEventListener(event, () => {
+        if (session?.token) resetLogoutTimer();
+      });
+    });
   } else {
     showPage("pg-login");
   }
-  document.getElementById("inp-password")
-    .addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  
+  const pwdInput = document.getElementById("inp-password");
+  if (pwdInput) {
+    pwdInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+  }
 };
 
 // ════════════════════════════════════════════════════════════════════════
-//  API — JSONP (solusi CORS untuk Google Apps Script)
+//  API — JSONP
 // ════════════════════════════════════════════════════════════════════════
 function api(body) {
   return new Promise((resolve, reject) => {
@@ -142,8 +177,10 @@ async function doLogin() {
     session = { token: res.token, nama: res.nama, role: res.role, username: res.username };
     sessionStorage.setItem("sikas_session", JSON.stringify(session));
 
-    // Preload anggota di background
-    prefetchAnggota();
+    clearCache();
+    startLogoutTimer();
+    
+    await prefetchAnggota();
     showApp();
 
   } catch (err) {
@@ -161,34 +198,43 @@ function showErr(msg) {
 }
 
 function doLogout() {
+  if (logoutTimer) clearTimeout(logoutTimer);
+  
   sessionStorage.removeItem("sikas_session");
   session      = null;
   allAnggota   = [];
-  // Reset pagination
+  
   Object.keys(pgState).forEach(k => { pgState[k].page = 1; pgState[k].data = []; });
+  
   showPage("pg-login");
-  document.getElementById("inp-username").value = "";
-  document.getElementById("inp-password").value = "";
-  document.getElementById("login-err").style.display = "none";
+  const usernameInput = document.getElementById("inp-username");
+  const passwordInput = document.getElementById("inp-password");
+  if (usernameInput) usernameInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+  
+  const loginErr = document.getElementById("login-err");
+  if (loginErr) loginErr.style.display = "none";
+  
   showToast("Anda telah logout");
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  NAVIGATION — single-page routing
+//  NAVIGATION
 // ════════════════════════════════════════════════════════════════════════
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   const el = document.getElementById(id);
-  if (el) {
-    el.classList.add("active");
-  }
+  if (el) el.classList.add("active");
 }
 
 function showApp() {
   const h = new Date().getHours();
   const greeting = h < 12 ? "Selamat pagi" : h < 15 ? "Selamat siang" : h < 18 ? "Selamat sore" : "Selamat malam";
-  document.getElementById("dash-greeting").textContent = greeting + ", " + (session?.role === "admin" ? "Admin" : "Petugas");
-  document.getElementById("dash-nama").textContent     = session?.nama || "—";
+  const dashGreeting = document.getElementById("dash-greeting");
+  const dashNama = document.getElementById("dash-nama");
+  if (dashGreeting) dashGreeting.textContent = greeting + ", " + (session?.role === "admin" ? "Admin" : "Petugas");
+  if (dashNama) dashNama.textContent = session?.nama || "—";
+  
   showPage("pg-dashboard");
   loadDashboard();
 }
@@ -205,12 +251,11 @@ function goPage(page) {
   if (page === "dashboard") loadDashboard();
   if (page === "laporan")   { initFilterLaporan(); loadLaporan(); }
   if (page === "cari") {
-    document.getElementById("search-input").value = "";
+    const searchInput = document.getElementById("search-input");
+    if (searchInput) searchInput.value = "";
     renderSearchResults([]);
   }
-  if (page === "bayar") {
-    resetBayarForm();
-  }
+  if (page === "bayar") resetBayarForm();
 }
 
 function goBack() {
@@ -219,22 +264,36 @@ function goBack() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  PREFETCH — cache anggota saat login
+//  PREFETCH — dengan CACHE 1 JAM
 // ════════════════════════════════════════════════════════════════════════
 async function prefetchAnggota() {
   if (allAnggota.length) return;
+  
+  const cached = getCache("anggota");
+  if (cached) {
+    allAnggota = cached;
+    return;
+  }
+  
   try {
     const res = await api({ action: "getAnggota", token: session?.token });
-    if (res.status === "ok") allAnggota = res.data;
-  } catch (e) { /* silent */ }
+    if (res.status === "ok") {
+      allAnggota = res.data;
+      setCache("anggota", allAnggota);
+    }
+  } catch (e) { 
+    console.error("Prefetch error:", e);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ════════════════════════════════════════════════════════════════════════
 async function loadDashboard() {
-  document.getElementById("dash-belum-list").innerHTML =
-    `<div class="loading"><div class="spinner"></div> Memuat data…</div>`;
+  const belumList = document.getElementById("dash-belum-list");
+  if (belumList) {
+    belumList.innerHTML = `<div class="loading"><div class="spinner"></div> Memuat data…</div>`;
+  }
 
   try {
     await prefetchAnggota();
@@ -244,17 +303,22 @@ async function loadDashboard() {
     if (res.status !== "ok") throw new Error(res.message);
 
     const { laporan, detail } = res;
-
-    document.getElementById("s-total").textContent   = allAnggota.length || laporan.total_anggota;
-    document.getElementById("s-lunas").textContent   = laporan.sudah_bayar;
-    document.getElementById("s-belum").textContent   = laporan.belum_bayar;
-    document.getElementById("s-nominal").textContent = rp(laporan.total_terkumpul);
+    const sTotal = document.getElementById("s-total");
+    const sLunas = document.getElementById("s-lunas");
+    const sBelum = document.getElementById("s-belum");
+    const sNominal = document.getElementById("s-nominal");
+    const sProgress = document.getElementById("s-progress");
+    const sPct = document.getElementById("s-pct");
+    
+    if (sTotal) sTotal.textContent = allAnggota.length || laporan.total_anggota;
+    if (sLunas) sLunas.textContent = laporan.sudah_bayar;
+    if (sBelum) sBelum.textContent = laporan.belum_bayar;
+    if (sNominal) sNominal.textContent = rp(laporan.total_terkumpul);
 
     const totalPelanggan = allAnggota.length || laporan.total_anggota;
-    const pct = totalPelanggan
-      ? Math.round(laporan.sudah_bayar / totalPelanggan * 100) : 0;
-    document.getElementById("s-progress").style.width = pct + "%";
-    document.getElementById("s-pct").textContent      = pct + "% lunas";
+    const pct = totalPelanggan ? Math.round(laporan.sudah_bayar / totalPelanggan * 100) : 0;
+    if (sProgress) sProgress.style.width = pct + "%";
+    if (sPct) sPct.textContent = pct + "% lunas";
 
     const belum = (detail || []).filter(t => t.status === "Belum Bayar");
     pgState.dashboard.data = belum;
@@ -263,19 +327,19 @@ async function loadDashboard() {
 
   } catch (err) {
     console.error("Dashboard:", err);
-    document.getElementById("dash-belum-list").innerHTML =
-      `<div class="empty"><p>Gagal memuat data. Coba lagi.</p></div>`;
+    if (belumList) {
+      belumList.innerHTML = `<div class="empty"><p>Gagal memuat data. Coba lagi.</p></div>`;
+    }
   }
 }
 
 function renderDashboardList() {
   const { data, page } = pgState.dashboard;
   const el = document.getElementById("dash-belum-list");
+  if (!el) return;
 
   if (!data.length) {
-    el.innerHTML = `<div class="empty">
-      <p>✅ Semua anggota sudah lunas! 🎉</p>
-    </div>`;
+    el.innerHTML = `<div class="empty"><p>✅ Semua anggota sudah lunas! 🎉</p></div>`;
     return;
   }
 
@@ -298,7 +362,7 @@ function renderDashboardList() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  CARI ANGGOTA (dengan pagination)
+//  CARI ANGGOTA
 // ════════════════════════════════════════════════════════════════════════
 let searchTimer;
 function doSearch(val) {
@@ -326,6 +390,7 @@ function doSearch(val) {
 
 function renderSearchResults(list) {
   const el = document.getElementById("search-results");
+  if (!el) return;
   if (!list.length) { el.innerHTML = ""; return; }
 
   pgState.cari.data = list;
@@ -360,36 +425,42 @@ async function openDetail(id_anggota, from = "dashboard") {
   if (!anggota) return;
 
   currentAnggota = anggota;
-  document.getElementById("detail-nama").textContent    = anggota.nama;
-  document.getElementById("detail-norumah").textContent = `No ${anggota.no_rumah}`;
-  document.getElementById("detail-riwayat").innerHTML = "<div class='loading'>⏳ Memuat riwayat…</div>";
+  const detailNama = document.getElementById("detail-nama");
+  const detailNoRumah = document.getElementById("detail-norumah");
+  const detailRiwayat = document.getElementById("detail-riwayat");
+  
+  if (detailNama) detailNama.textContent = anggota.nama;
+  if (detailNoRumah) detailNoRumah.textContent = `No ${anggota.no_rumah}`;
+  if (detailRiwayat) detailRiwayat.innerHTML = "<div class='loading'>⏳ Memuat riwayat…</div>";
 
   showPage("pg-detail");
 
   try {
     const res = await api({ action: "getRiwayat", token: session?.token, id_anggota: id_anggota });
     if (res.status === "ok") {
-      if (res.data.length === 0) {
-        document.getElementById("detail-riwayat").innerHTML = "<div class='empty'>Belum ada riwayat pembayaran</div>";
-      } else {
-        document.getElementById("detail-riwayat").innerHTML = res.data.map(r => `
-          <div class="info-row">
-            <span class="lbl">${r.jenis_iuran} · ${r.bulan_dibayar} ${r.tahun}</span>
-            <span class="val">${rp(r.nominal)}</span>
-          </div>
-        `).join("");
+      if (detailRiwayat) {
+        if (res.data.length === 0) {
+          detailRiwayat.innerHTML = "<div class='empty'>Belum ada riwayat pembayaran</div>";
+        } else {
+          detailRiwayat.innerHTML = res.data.map(r => `
+            <div class="info-row">
+              <span class="lbl">${r.jenis_iuran} · ${r.bulan_dibayar} ${r.tahun}</span>
+              <span class="val">${rp(r.nominal)}</span>
+            </div>
+          `).join("");
+        }
       }
     } else {
-      document.getElementById("detail-riwayat").innerHTML = "<div class='empty'>Gagal memuat riwayat</div>";
+      if (detailRiwayat) detailRiwayat.innerHTML = "<div class='empty'>Gagal memuat riwayat</div>";
     }
   } catch (err) {
     console.error("Detail:", err);
-    document.getElementById("detail-riwayat").innerHTML = "<div class='empty'>Gagal memuat riwayat</div>";
+    if (detailRiwayat) detailRiwayat.innerHTML = "<div class='empty'>Gagal memuat riwayat</div>";
   }
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  FORM BAYAR (dengan pagination di hasil pencarian)
+//  FORM BAYAR
 // ════════════════════════════════════════════════════════════════════════
 let bayarAnggota = null;
 let bayarSearchTimer;
@@ -398,15 +469,21 @@ function resetBayarForm() {
   bayarAnggota = null;
   pgState.bayar.data = [];
   pgState.bayar.page = 1;
-  document.getElementById("bayar-search").value = "";
-  document.getElementById("bayar-search-results").innerHTML = "";
-  document.getElementById("bayar-form-card").style.display = "none";
+  const bayarSearch = document.getElementById("bayar-search");
+  const bayarSearchResults = document.getElementById("bayar-search-results");
+  const bayarFormCard = document.getElementById("bayar-form-card");
+  if (bayarSearch) bayarSearch.value = "";
+  if (bayarSearchResults) bayarSearchResults.innerHTML = "";
+  if (bayarFormCard) bayarFormCard.style.display = "none";
 }
 
 function doBayarSearch(val) {
   clearTimeout(bayarSearchTimer);
+  const bayarSearchResults = document.getElementById("bayar-search-results");
+  if (!bayarSearchResults) return;
+  
   if (!val.trim()) {
-    document.getElementById("bayar-search-results").innerHTML = "";
+    bayarSearchResults.innerHTML = "";
     pgState.bayar.data = [];
     return;
   }
@@ -432,6 +509,8 @@ function doBayarSearch(val) {
 
 function renderBayarSearchResults(list) {
   const el = document.getElementById("bayar-search-results");
+  if (!el) return;
+  
   if (!list.length) {
     el.innerHTML = `<p style="color:var(--c-text3);font-size:13px;padding:8px 0;">Tidak ditemukan.</p>`;
     return;
@@ -462,11 +541,17 @@ async function pilihAnggotaBayar(id) {
   bayarAnggota = allAnggota.find(a => a.id_anggota === id);
   if (!bayarAnggota) return;
 
-  document.getElementById("bayar-nama").textContent = bayarAnggota.nama;
-  document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
-  document.getElementById("bayar-search").value = bayarAnggota.nama;
-  document.getElementById("bayar-search-results").innerHTML = "";
-  document.getElementById("bayar-form-card").style.display = "block";
+  const bayarNama = document.getElementById("bayar-nama");
+  const bayarNoRumah = document.getElementById("bayar-norumah");
+  const bayarSearch = document.getElementById("bayar-search");
+  const bayarSearchResults = document.getElementById("bayar-search-results");
+  const bayarFormCard = document.getElementById("bayar-form-card");
+  
+  if (bayarNama) bayarNama.textContent = bayarAnggota.nama;
+  if (bayarNoRumah) bayarNoRumah.textContent = bayarAnggota.no_rumah;
+  if (bayarSearch) bayarSearch.value = bayarAnggota.nama;
+  if (bayarSearchResults) bayarSearchResults.innerHTML = "";
+  if (bayarFormCard) bayarFormCard.style.display = "block";
   
   await loadTunggakan(bayarAnggota.id_anggota);
 }
@@ -479,31 +564,46 @@ async function loadTunggakan(id) {
       const kasList = res.data.kas || [];
       const rmdList = res.data.rmd || [];
       
-      document.getElementById("tunggakan-kas").innerHTML = `
-        <div class="info-row">
-          <span class="lbl">💰 Kas (${rp(res.data.iuran_kas)}/bln)</span>
-          <span class="val">${kasList.length} bulan tunggakan · ${rp(res.data.total_kas)}</span>
-        </div>
-      `;
+      const tunggakanKas = document.getElementById("tunggakan-kas");
+      const tunggakanRmd = document.getElementById("tunggakan-rmd");
+      const bayarTotal = document.getElementById("bayar-total");
+      const bayarJmlKas = document.getElementById("bayar-jml-kas");
+      const bayarJmlRmd = document.getElementById("bayar-jml-rmd");
+      const bayarRmdGroup = document.getElementById("bayar-rmd-group");
       
-      if (rmdList.length > 0) {
-        document.getElementById("bayar-rmd-group").style.display = "block";
-        document.getElementById("tunggakan-rmd").innerHTML = `
+      if (tunggakanKas) {
+        tunggakanKas.innerHTML = `
           <div class="info-row">
-            <span class="lbl">🏦 RMD (${rp(res.data.iuran_rmd)}/bln)</span>
-            <span class="val">${rmdList.length} bulan tunggakan · ${rp(res.data.total_rmd)}</span>
+            <span class="lbl">💰 Kas (${rp(res.data.iuran_kas)}/bln)</span>
+            <span class="val">${kasList.length} bulan tunggakan · ${rp(res.data.total_kas)}</span>
           </div>
         `;
-      } else {
-        document.getElementById("bayar-rmd-group").style.display = "none";
-        document.getElementById("tunggakan-rmd").innerHTML = "";
       }
       
-      document.getElementById("bayar-total").textContent = rp(res.data.total_kas + res.data.total_rmd);
-      document.getElementById("bayar-jml-kas").value = 0;
-      document.getElementById("bayar-jml-kas").max = kasList.length;
-      document.getElementById("bayar-jml-rmd").value = 0;
-      if (rmdList.length) document.getElementById("bayar-jml-rmd").max = rmdList.length;
+      if (rmdList.length > 0) {
+        if (bayarRmdGroup) bayarRmdGroup.style.display = "block";
+        if (tunggakanRmd) {
+          tunggakanRmd.innerHTML = `
+            <div class="info-row">
+              <span class="lbl">🏦 RMD (${rp(res.data.iuran_rmd)}/bln)</span>
+              <span class="val">${rmdList.length} bulan tunggakan · ${rp(res.data.total_rmd)}</span>
+            </div>
+          `;
+        }
+      } else {
+        if (bayarRmdGroup) bayarRmdGroup.style.display = "none";
+        if (tunggakanRmd) tunggakanRmd.innerHTML = "";
+      }
+      
+      if (bayarTotal) bayarTotal.textContent = rp(res.data.total_kas + res.data.total_rmd);
+      if (bayarJmlKas) {
+        bayarJmlKas.value = 0;
+        bayarJmlKas.max = kasList.length;
+      }
+      if (bayarJmlRmd) {
+        bayarJmlRmd.value = 0;
+        if (rmdList.length) bayarJmlRmd.max = rmdList.length;
+      }
       updateTotalBayar();
     }
   } catch(e) { 
@@ -512,15 +612,16 @@ async function loadTunggakan(id) {
 }
 
 function updateTotalBayar() {
-  const jmlKas = parseInt(document.getElementById("bayar-jml-kas").value) || 0;
-  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd").value) || 0;
+  const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
+  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
   const total = (jmlKas * (currentTunggakan?.iuran_kas || 0)) + (jmlRmd * (currentTunggakan?.iuran_rmd || 0));
-  document.getElementById("bayar-grand").textContent = rp(total);
+  const bayarGrand = document.getElementById("bayar-grand");
+  if (bayarGrand) bayarGrand.textContent = rp(total);
 }
 
 async function simpanPembayaran() {
-  const jmlKas = parseInt(document.getElementById("bayar-jml-kas").value) || 0;
-  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd").value) || 0;
+  const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
+  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
   
   if (jmlKas === 0 && jmlRmd === 0) {
     showToast("Pilih minimal 1 bulan untuk dibayar", "error");
@@ -529,8 +630,10 @@ async function simpanPembayaran() {
   
   const periode = `${BULAN_INI} ${TAHUN_INI}`;
   const btn = document.getElementById("btn-simpan-bayar");
-  btn.disabled = true;
-  btn.textContent = "⏳ Menyimpan...";
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "⏳ Menyimpan...";
+  }
   
   try {
     const res = await api({ 
@@ -555,8 +658,10 @@ async function simpanPembayaran() {
   } catch(e) { 
     showToast("Error: " + e.message, "error"); 
   } finally { 
-    btn.disabled = false; 
-    btn.textContent = "💾 Simpan Pembayaran"; 
+    if (btn) {
+      btn.disabled = false; 
+      btn.textContent = "💾 Simpan Pembayaran";
+    }
   }
 }
 
@@ -565,7 +670,7 @@ async function simpanPembayaran() {
 // ════════════════════════════════════════════════════════════════════════
 function initFilterLaporan() {
   const selBulan = document.getElementById("lap-filter-bulan");
-  if (!selBulan.options.length) {
+  if (selBulan && !selBulan.options.length) {
     BULAN_LIST.forEach(b => {
       const opt = document.createElement("option");
       opt.value = b;
@@ -576,7 +681,7 @@ function initFilterLaporan() {
   }
   
   const selTahun = document.getElementById("lap-filter-tahun");
-  if (!selTahun.options.length) {
+  if (selTahun && !selTahun.options.length) {
     for (let y = TAHUN_INI; y >= TAHUN_INI - 3; y--) {
       const opt = document.createElement("option");
       opt.value = y;
@@ -588,30 +693,39 @@ function initFilterLaporan() {
 }
 
 function terapkanFilterLaporan() {
-  const bulan = document.getElementById("lap-filter-bulan").value;
-  const tahun = document.getElementById("lap-filter-tahun").value;
+  const bulan = document.getElementById("lap-filter-bulan")?.value || BULAN_INI;
+  const tahun = parseInt(document.getElementById("lap-filter-tahun")?.value || TAHUN_INI);
   pgState.laporan.page = 1;
   loadLaporan(bulan, tahun);
 }
 
 async function loadLaporan(bulan = BULAN_INI, tahun = TAHUN_INI) {
   const periode = `${bulan} ${tahun}`;
-  document.getElementById("lap-periode").textContent = periode;
+  const lapPeriode = document.getElementById("lap-periode");
+  if (lapPeriode) lapPeriode.textContent = periode;
+  
   ["lap-total","lap-lunas","lap-belum","lap-terkumpul"].forEach(id => { 
     const el = document.getElementById(id); 
     if (el) el.textContent = "…"; 
   });
-  document.getElementById("lap-list").innerHTML = `<div class="loading"><div class="spinner"></div> Memuat…</div>`;
+  
+  const lapList = document.getElementById("lap-list");
+  if (lapList) lapList.innerHTML = `<div class="loading"><div class="spinner"></div> Memuat…</div>`;
 
   try {
     const res = await api({ action: "getLaporanPeriode", token: session?.token, periode: periode });
     if (res.status !== "ok") throw new Error(res.message);
 
     const { laporan, detail } = res;
-    document.getElementById("lap-total").textContent     = laporan.total_anggota;
-    document.getElementById("lap-lunas").textContent     = laporan.sudah_bayar;
-    document.getElementById("lap-belum").textContent     = laporan.belum_bayar;
-    document.getElementById("lap-terkumpul").textContent = rp(laporan.total_terkumpul);
+    const lapTotal = document.getElementById("lap-total");
+    const lapLunas = document.getElementById("lap-lunas");
+    const lapBelum = document.getElementById("lap-belum");
+    const lapTerkumpul = document.getElementById("lap-terkumpul");
+    
+    if (lapTotal) lapTotal.textContent = laporan.total_anggota;
+    if (lapLunas) lapLunas.textContent = laporan.sudah_bayar;
+    if (lapBelum) lapBelum.textContent = laporan.belum_bayar;
+    if (lapTerkumpul) lapTerkumpul.textContent = rp(laporan.total_terkumpul);
 
     pgState.laporan.data = detail || [];
     pgState.laporan.page = 1;
@@ -619,13 +733,14 @@ async function loadLaporan(bulan = BULAN_INI, tahun = TAHUN_INI) {
 
   } catch (err) {
     console.error("Laporan:", err);
-    document.getElementById("lap-list").innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`;
+    if (lapList) lapList.innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`;
   }
 }
 
 function renderLaporanList() {
   const { data, page } = pgState.laporan;
   const el = document.getElementById("lap-list");
+  if (!el) return;
 
   if (!data.length) {
     el.innerHTML = `<div class="empty"><p>Tidak ada data untuk periode ini</p></div>`;
@@ -667,14 +782,10 @@ function renderPagination(section, page, totalPages, total, start, end) {
     <span class="pagination-info">${start}–${end} dari ${total}</span>
     <div class="pagination-btns">
       <button class="pg-btn" onclick="changePage('${section}',-1)" ${page <= 1 ? "disabled" : ""}>
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-          <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+        ←
       </button>
       <button class="pg-btn" onclick="changePage('${section}',1)" ${page >= totalPages ? "disabled" : ""}>
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24">
-          <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
+        →
       </button>
     </div>
   </div>`;
