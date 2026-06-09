@@ -1,9 +1,7 @@
 /* ═══════════════════════════════════════════════
-   SiKAS — app.js
-   Sistem Iuran Kas & RMD
+   SiKAS — app.js (FINAL PERBAIKAN)
 ═══════════════════════════════════════════════ */
 
-// ── CONFIG ───────────────────────────────────────────────────────────────
 const API_URL = "https://script.google.com/macros/s/AKfycbxcUpbCyoHBwObkdKksdhDwBzNAYgEvGawL4bKde5YY3lqeACGF3psIp6rahGMLrFJR/exec";
 
 const BULAN_LIST = ["Januari","Februari","Maret","April","Mei","Juni",
@@ -11,13 +9,13 @@ const BULAN_LIST = ["Januari","Februari","Maret","April","Mei","Juni",
 const BULAN_INI  = BULAN_LIST[new Date().getMonth()];
 const TAHUN_INI  = new Date().getFullYear();
 
-// ── CACHE CONFIG ─────────────────────────────────────────────────────────
+// ── CACHE ────────────────────────────────────────────────────────────────
 const CACHE_KEY = "sikas_cache";
 const CACHE_EXPIRY = 60 * 60 * 1000;
 let logoutTimer = null;
 
 function setCache(key, data) {
-  localStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify({ timestamp: Date.now(), data: data }));
+  localStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify({ timestamp: Date.now(), data }));
 }
 function getCache(key) {
   const cached = localStorage.getItem(`${CACHE_KEY}_${key}`);
@@ -30,7 +28,9 @@ function getCache(key) {
   return cache.data;
 }
 function clearCache() {
-  Object.keys(localStorage).forEach(key => { if (key.startsWith(CACHE_KEY)) localStorage.removeItem(key); });
+  Object.keys(localStorage).forEach(key => {
+    if (key.startsWith(CACHE_KEY)) localStorage.removeItem(key);
+  });
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ let currentAnggota = null;
 let currentTunggakan = null;
 let fromPage = "dashboard";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 3;
 const pgState = {
   dashboard: { page: 1, data: [] },
   cari: { page: 1, data: [] },
@@ -49,12 +49,15 @@ const pgState = {
 };
 
 // ════════════════════════════════════════════════════════════════════════
-//  AUTO LOGOUT TIMER
+//  AUTO LOGOUT
 // ════════════════════════════════════════════════════════════════════════
 function startLogoutTimer() {
   if (logoutTimer) clearTimeout(logoutTimer);
   logoutTimer = setTimeout(() => {
-    if (session?.token) { showToast("⏰ Sesi berakhir, silakan login ulang", "warning"); doLogout(); }
+    if (session?.token) {
+      showToast("⏰ Sesi berakhir, silakan login ulang", "warning");
+      doLogout();
+    }
   }, 5 * 60 * 60 * 1000);
 }
 function resetLogoutTimer() {
@@ -77,13 +80,13 @@ window.onload = () => {
 };
 
 // ════════════════════════════════════════════════════════════════════════
-//  API — JSONP
+//  API JSONP
 // ════════════════════════════════════════════════════════════════════════
 function api(body) {
   return new Promise((resolve, reject) => {
     const cb = "cb_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
     const url = API_URL + "?data=" + encodeURIComponent(JSON.stringify(body)) + "&callback=" + cb;
-    const timer = setTimeout(() => { cleanup(); reject(new Error("timeout")); showToast("Request timeout", "error"); }, 20000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, 20000);
     function cleanup() {
       clearTimeout(timer);
       delete window[cb];
@@ -93,7 +96,7 @@ function api(body) {
     const script = document.createElement("script");
     script.id = "jsonp-" + cb;
     script.src = url;
-    script.onerror = () => { cleanup(); reject(new Error("network")); showToast("Gagal terhubung", "error"); };
+    script.onerror = () => { cleanup(); reject(new Error("network")); };
     document.body.appendChild(script);
   });
 }
@@ -143,7 +146,9 @@ function doLogout() {
 // ════════════════════════════════════════════════════════════════════════
 function showPage(id) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.getElementById(id)?.classList.add("active");
+  const el = document.getElementById(id);
+  if (el) el.classList.add("active");
+  window.scrollTo(0, 0);
 }
 function showApp() {
   const h = new Date().getHours();
@@ -188,11 +193,11 @@ async function loadDashboard() {
     const res = await api({ action: "getLaporanPeriode", token: session?.token, periode });
     if (res.status !== "ok") throw new Error(res.message);
     const { laporan, detail } = res;
-    document.getElementById("s-total").textContent = allAnggota.length || laporan.total_anggota;
+    document.getElementById("s-total").textContent = allAnggota.length;
     document.getElementById("s-lunas").textContent = laporan.sudah_bayar;
     document.getElementById("s-belum").textContent = laporan.belum_bayar;
     document.getElementById("s-nominal").textContent = rp(laporan.total_terkumpul);
-    const total = allAnggota.length || laporan.total_anggota;
+    const total = allAnggota.length;
     const pct = total ? Math.round(laporan.sudah_bayar / total * 100) : 0;
     document.getElementById("s-progress").style.width = pct + "%";
     document.getElementById("s-pct").textContent = pct + "% lunas";
@@ -284,7 +289,7 @@ async function openDetail(id, from = "dashboard") {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  FORM BAYAR (PERBAIKAN - TANPA ERROR)
+//  FORM BAYAR (PERBAIKAN)
 // ════════════════════════════════════════════════════════════════════════
 let bayarAnggota = null;
 let bayarSearchTimer;
@@ -294,32 +299,21 @@ function resetBayarForm() {
   pgState.bayar.data = [];
   pgState.bayar.page = 1;
   
-  // Reset dengan aman (cek element existence)
-  const bayarSearch = document.getElementById("bayar-search");
-  const bayarSearchResults = document.getElementById("bayar-search-results");
-  const bayarFormCard = document.getElementById("bayar-form-card");
-  const bayarNama = document.getElementById("bayar-nama");
-  const bayarNoRumah = document.getElementById("bayar-norumah");
-  const tunggakanKas = document.getElementById("tunggakan-kas");
-  const tunggakanRmd = document.getElementById("tunggakan-rmd");
-  const bayarTotal = document.getElementById("bayar-total");
-  const bayarGrand = document.getElementById("bayar-grand");
-  const bayarJmlKas = document.getElementById("bayar-jml-kas");
-  const bayarJmlRmd = document.getElementById("bayar-jml-rmd");
-  const bayarRmdGroup = document.getElementById("bayar-rmd-group");
-  
-  if (bayarSearch) bayarSearch.value = "";
-  if (bayarSearchResults) bayarSearchResults.innerHTML = "";
-  if (bayarFormCard) bayarFormCard.style.display = "none";
-  if (bayarNama) bayarNama.textContent = "—";
-  if (bayarNoRumah) bayarNoRumah.textContent = "—";
-  if (tunggakanKas) tunggakanKas.innerHTML = "";
-  if (tunggakanRmd) tunggakanRmd.innerHTML = "";
-  if (bayarTotal) bayarTotal.textContent = "Rp 0";
-  if (bayarGrand) bayarGrand.textContent = "Rp 0";
-  if (bayarJmlKas) bayarJmlKas.value = 0;
-  if (bayarJmlRmd) bayarJmlRmd.value = 0;
-  if (bayarRmdGroup) bayarRmdGroup.style.display = "none";
+  const ids = ["bayar-search", "bayar-search-results", "bayar-form-card", "bayar-nama", "bayar-norumah",
+    "tunggakan-kas", "tunggakan-rmd", "bayar-total", "bayar-grand", "bayar-jml-kas", "bayar-jml-rmd", "bayar-rmd-group"];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      if (el.tagName === "INPUT") el.value = "";
+      else if (el.tagName === "DIV") el.innerHTML = "";
+      else if (el.id === "bayar-form-card") el.style.display = "none";
+      else if (el.id === "bayar-rmd-group") el.style.display = "none";
+      else if (el.id === "bayar-nama") el.textContent = "—";
+      else if (el.id === "bayar-norumah") el.textContent = "—";
+      else if (el.id === "bayar-total") el.textContent = "Rp 0";
+      else if (el.id === "bayar-grand") el.textContent = "Rp 0";
+    }
+  });
 }
 
 function doBayarSearch(val) {
@@ -353,7 +347,7 @@ function renderBayarSearchResults(list) {
   el.innerHTML = pg.items.map(p => `
     <div class="pel-item" onclick="pilihAnggotaBayar('${esc(p.id_anggota)}')" style="cursor:pointer;">
       <div class="avatar av-b">${initials(p.nama)}</div>
-      <div class="pel-info"><div class="pel-name">${escHtml(p.nama)}</div><div class="pel-sub">No ${escHtml(p.no_rumah)}</div></div>
+      <div class="pel-info"><div class="pel-name">${escHtml(p.nama)}</div><div class="pel-sub">No ${escHtml(p.no_rumah)} · ${rp(p.iuran_kas)}/bln</div></div>
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
     </div>
   `).join("") + renderPagination("bayar", pg.curPage, pg.totalPages, list.length, pg.start, pg.end);
@@ -366,62 +360,57 @@ async function pilihAnggotaBayar(id) {
   bayarAnggota = allAnggota.find(a => a.id_anggota == id);
   if (!bayarAnggota) { showToast("Anggota tidak ditemukan", "error"); return; }
   
-  // Update info anggota
-  document.getElementById("bayar-nama").textContent = bayarAnggota.nama;
+  document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_kas)}/bln)`;
   document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
   document.getElementById("bayar-search").value = bayarAnggota.nama;
   document.getElementById("bayar-search-results").innerHTML = "";
   document.getElementById("bayar-form-card").style.display = "block";
   
-  // Load tunggakan
   await loadTunggakan(bayarAnggota.id_anggota);
 }
 
 async function loadTunggakan(id) {
-  console.log("loadTunggakan:", id);
   const kasEl = document.getElementById("tunggakan-kas");
   const rmdEl = document.getElementById("tunggakan-rmd");
   const totalEl = document.getElementById("bayar-total");
   
   if (kasEl) kasEl.innerHTML = "<div class='loading'>⏳ Memuat tunggakan...</div>";
+  if (rmdEl) rmdEl.innerHTML = "";
   
   try {
     const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: id });
-    console.log("Response:", res);
+    console.log("Response tunggakan:", res);
+    
     if (res.status === "ok" && res.data) {
       currentTunggakan = res.data;
       const kasList = res.data.kas || [];
       const rmdList = res.data.rmd || [];
+      const iuranKas = res.data.iuran_kas;
+      const iuranRmd = res.data.iuran_rmd;
       
-      // Render Kas
       if (kasEl) {
         if (kasList.length === 0) {
           kasEl.innerHTML = `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`;
         } else {
-          kasEl.innerHTML = kasList.map(t => `
-            <div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>
-          `).join("");
+          kasEl.innerHTML = `<div class="section-label">💰 Kas (${rp(iuranKas)}/bulan)</div>` +
+            kasList.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
         }
       }
       
-      // Render RMD
-      if (rmdList.length > 0 && res.data.ikut_rmd) {
-        const rmdGroup = document.getElementById("bayar-rmd-group");
+      const rmdGroup = document.getElementById("bayar-rmd-group");
+      if (bayarAnggota.ikut_rmd && rmdList.length > 0) {
         if (rmdGroup) rmdGroup.style.display = "block";
         if (rmdEl) {
-          rmdEl.innerHTML = rmdList.map(t => `
-            <div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>
-          `).join("");
+          rmdEl.innerHTML = `<div class="section-label">🏦 RMD (${rp(iuranRmd)}/bulan)</div>` +
+            rmdList.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
         }
       } else {
-        const rmdGroup = document.getElementById("bayar-rmd-group");
         if (rmdGroup) rmdGroup.style.display = "none";
         if (rmdEl) rmdEl.innerHTML = "";
       }
       
       if (totalEl) totalEl.textContent = rp(res.data.total_kas + res.data.total_rmd);
       
-      // Set max untuk input jumlah bulan
       const jmlKas = document.getElementById("bayar-jml-kas");
       const jmlRmd = document.getElementById("bayar-jml-rmd");
       if (jmlKas) { jmlKas.max = kasList.length; jmlKas.value = 0; }
@@ -430,7 +419,7 @@ async function loadTunggakan(id) {
       updateTotalBayar();
       showToast(`Tunggakan: ${kasList.length} bulan Kas${rmdList.length > 0 ? `, ${rmdList.length} bulan RMD` : ""}`, "success");
     } else {
-      if (kasEl) kasEl.innerHTML = `<div class="empty">Gagal: ${res.message}</div>`;
+      if (kasEl) kasEl.innerHTML = `<div class="empty">Gagal: ${res.message || "Unknown"}</div>`;
       showToast(res.message || "Gagal memuat tunggakan", "error");
     }
   } catch(e) {
@@ -475,13 +464,15 @@ async function simpanPembayaran() {
         petugas: session?.nama || session?.username
       }
     });
+    console.log("Response simpan:", res);
     if (res.status === "ok") {
       showToast(res.message, "success");
       clearCache();
       resetBayarForm();
-      loadDashboard();
+      await loadDashboard();
     } else {
       showToast(res.message || "Gagal menyimpan", "error");
+      if (res.message === "Sesi tidak valid. Silakan login ulang.") doLogout();
     }
   } catch(e) {
     showToast("Error: " + e.message, "error");
@@ -491,7 +482,7 @@ async function simpanPembayaran() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  LAPORAN
+//  LAPORAN (dengan breakdown Kas, RMD, Grand Total)
 // ════════════════════════════════════════════════════════════════════════
 function initFilterLaporan() {
   const selBulan = document.getElementById("lap-filter-bulan");
@@ -511,7 +502,9 @@ async function loadLaporan() {
   const tahun = document.getElementById("lap-filter-tahun")?.value || TAHUN_INI;
   const periode = `${bulan} ${tahun}`;
   document.getElementById("lap-periode").textContent = periode;
-  ["lap-total","lap-lunas","lap-belum","lap-terkumpul"].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = "…"; });
+  ["lap-total","lap-lunas","lap-belum","lap-terkumpul","lap-total-kas","lap-total-rmd","lap-grand-total"].forEach(id => { 
+    const el = document.getElementById(id); if (el) el.textContent = "…"; 
+  });
   const lapList = document.getElementById("lap-list");
   if (lapList) lapList.innerHTML = `<div class="loading">⏳ Memuat…</div>`;
   try {
@@ -522,6 +515,9 @@ async function loadLaporan() {
     document.getElementById("lap-lunas").textContent = laporan.sudah_bayar;
     document.getElementById("lap-belum").textContent = laporan.belum_bayar;
     document.getElementById("lap-terkumpul").textContent = rp(laporan.total_terkumpul);
+    document.getElementById("lap-total-kas").textContent = rp(laporan.total_kas || 0);
+    document.getElementById("lap-total-rmd").textContent = rp(laporan.total_rmd || 0);
+    document.getElementById("lap-grand-total").textContent = rp((laporan.total_kas || 0) + (laporan.total_rmd || 0));
     pgState.laporan.data = detail || [];
     pgState.laporan.page = 1;
     renderLaporanList();
@@ -540,7 +536,7 @@ function renderLaporanList() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  PAGINATION HELPER
+//  PAGINATION
 // ════════════════════════════════════════════════════════════════════════
 function paginate(data, page) {
   const total = data.length;
