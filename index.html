@@ -75,27 +75,7 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════════════════════ FORM BAYAR ══════════════ -->
-<!--div class="page" id="pg-bayar">
-  ...
-  <div class="card" id="bayar-form-card" style="display:none;">
-    <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
-    <div class="card-body">
-      <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
-      <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
-      <div class="divider"></div>
-      <div id="tunggakan-kas"></div>
-      <div id="tunggakan-rmd"></div>
-      <div class="total-box"><div class="info-row"><span class="lbl">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div></div>
-      <div class="form-group"><label class="form-label">Jumlah Bulan Kas</label><input class="form-input" id="bayar-jml-kas" type="number" min="0" value="0" oninput="updateTotalBayar()"></div>
-      <div class="form-group" id="bayar-rmd-group" style="display:none;"><label class="form-label">Jumlah Bulan RMD</label><input class="form-input" id="bayar-jml-rmd" type="number" min="0" value="0" oninput="updateTotalBayar()"></div>
-      <div class="info-row"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
-      <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()">💾 Simpan Pembayaran</button>
-    </div>
-  </div>
-</div -->
-
-<!-- ══════════════════════════════════════════ FORM BAYAR (DESAIN AWAL) ═══════════════ -->
+<!-- ══════════════════════════════════════════ FORM BAYAR ═══════════════ -->
 <div class="page" id="pg-bayar">
   <div class="topbar">
     <div class="topbar-row">
@@ -106,7 +86,7 @@
 
     <!-- Pilih Anggota -->
     <div class="card">
-      <div class="card-header"><span class="card-title">Pilih Anggota</span></div>
+      <div class="card-header"><span class="card-title">Cari Anggota</span></div>
       <div class="card-body">
         <div class="search-wrap">
           <span>🔍</span>
@@ -118,74 +98,47 @@
 
     <!-- Form Pembayaran (muncul setelah pilih anggota) -->
     <div class="card" id="bayar-form-card" style="display:none;">
-      <div class="card-header"><span class="card-title">Form Pembayaran</span></div>
+      <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
       <div class="card-body">
-        
-        <!-- Informasi Anggota -->
         <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
         <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
         <div class="divider"></div>
         
-        <!-- Jenis Iuran (Checkbox) -->
-        <div class="section-label">Jenis Iuran</div>
-        <div style="display: flex; gap: 16px; margin-bottom: 16px;">
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="jenis-kas-checkbox" checked onchange="toggleJenisIuran()"> 💰 Kas
-          </label>
-          <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-            <input type="checkbox" id="jenis-rmd-checkbox" onchange="toggleJenisIuran()"> 🏦 RMD
-          </label>
-        </div>
+        <!-- Sisa tunggakan KAS -->
+        <div id="tunggakan-kas" class="tunggakan-container"></div>
         
-        <!-- Sisa Tunggakan KAS -->
-        <div id="kas-section">
-          <div class="section-label">Sisa tunggakan KAS</div>
-          <div id="tunggakan-kas-list" class="tunggakan-container"></div>
-          <div class="info-row" style="margin-top: 8px;"><span class="lbl">Total Kas</span><span class="val" id="tunggakan-kas-total">Rp 0</span></div>
-        </div>
+        <!-- Sisa tunggakan RMD -->
+        <div id="tunggakan-rmd" class="tunggakan-container"></div>
         
-        <!-- Sisa Tunggakan RMD -->
-        <div id="rmd-section" style="display:none;">
-          <div class="section-label">Sisa tunggakan RMD</div>
-          <div id="tunggakan-rmd-list" class="tunggakan-container"></div>
-          <div class="info-row" style="margin-top: 8px;"><span class="lbl">Total RMD</span><span class="val" id="tunggakan-rmd-total">Rp 0</span></div>
-        </div>
-        
-        <!-- Total Tunggakan -->
         <div class="total-box">
-          <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total" id="total-tunggakan">Rp 0</span></div>
+          <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div>
         </div>
         
-        <!-- Jumlah Bulan yang Dibayar -->
         <div class="form-row">
-          <div class="form-group" id="bayar-kas-group">
-            <label class="form-label">Bayar KAS (bulan)</label>
+          <div class="form-group">
+            <label class="form-label">Jumlah Bulan Kas yang Dibayar</label>
             <input class="form-input" id="bayar-jml-kas" type="number" min="0" value="0" oninput="updateTotalBayar()">
           </div>
           <div class="form-group" id="bayar-rmd-group" style="display:none;">
-            <label class="form-label">Bayar RMD (bulan)</label>
+            <label class="form-label">Jumlah Bulan RMD yang Dibayar</label>
             <input class="form-input" id="bayar-jml-rmd" type="number" min="0" value="0" oninput="updateTotalBayar()">
           </div>
         </div>
         
-        <!-- Total Dibayar -->
-        <div class="total-box" style="background: var(--c-green-l);">
-          <div class="info-row"><span class="lbl" style="font-weight:700;">Total yang harus dibayar</span><span class="val total" id="total-dibayar">Rp 0</span></div>
-        </div>
+        <div class="info-row" style="margin-top:12px;"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
         
-        <!-- Periode Tagihan -->
-        <div class="form-group">
-          <label class="form-label">Periode tagihan</label>
-          <select class="form-input" id="periode-tagihan"></select>
-        </div>
-        
-        <!-- Submit Button -->
-        <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;">
-          💾 SUBMIT PEMBAYARAN
-        </button>
-        
+        <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;margin-top:16px;">💾 Simpan Pembayaran</button>
       </div>
     </div>
+
+  </div>
+  <nav class="bottom-nav">
+    <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
+    <button class="nav-item" onclick="goPage('cari')">🔍 Cari</button>
+    <button class="nav-item active" onclick="goPage('bayar')">💰 Bayar</button>
+    <button class="nav-item" onclick="goPage('laporan')">📊 Laporan</button>
+  </nav>
+</div>
 
   </div>
   <nav class="bottom-nav">
