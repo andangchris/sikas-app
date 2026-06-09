@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════
    SiKAS — app.js
    Sistem Iuran Kas & RMD
-   Tampilan Form Pembayaran dengan Checkbox Jenis Iuran
 ═══════════════════════════════════════════════ */
 
 // ── CONFIG ───────────────────────────────────────────────────────────────
@@ -285,7 +284,7 @@ async function openDetail(id, from = "dashboard") {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  FORM BAYAR — DESAIN AWAL (DENGAN CHECKBOX JENIS IURAN)
+//  FORM BAYAR (PERBAIKAN - TANPA ERROR)
 // ════════════════════════════════════════════════════════════════════════
 let bayarAnggota = null;
 let bayarSearchTimer;
@@ -295,27 +294,32 @@ function resetBayarForm() {
   pgState.bayar.data = [];
   pgState.bayar.page = 1;
   
-  // Reset semua element dengan aman (cek keberadaan element)
-  const elements = ["bayar-search", "bayar-search-results", "bayar-form-card", "bayar-nama", "bayar-norumah",
-    "tunggakan-kas-list", "tunggakan-kas-total", "tunggakan-rmd-list", "tunggakan-rmd-total",
-    "total-tunggakan", "jenis-kas-checkbox", "jenis-rmd-checkbox", "bayar-jml-kas", "bayar-jml-rmd",
-    "total-dibayar", "periode-tagihan", "btn-simpan-bayar"];
+  // Reset dengan aman (cek element existence)
+  const bayarSearch = document.getElementById("bayar-search");
+  const bayarSearchResults = document.getElementById("bayar-search-results");
+  const bayarFormCard = document.getElementById("bayar-form-card");
+  const bayarNama = document.getElementById("bayar-nama");
+  const bayarNoRumah = document.getElementById("bayar-norumah");
+  const tunggakanKas = document.getElementById("tunggakan-kas");
+  const tunggakanRmd = document.getElementById("tunggakan-rmd");
+  const bayarTotal = document.getElementById("bayar-total");
+  const bayarGrand = document.getElementById("bayar-grand");
+  const bayarJmlKas = document.getElementById("bayar-jml-kas");
+  const bayarJmlRmd = document.getElementById("bayar-jml-rmd");
+  const bayarRmdGroup = document.getElementById("bayar-rmd-group");
   
-  elements.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (el.tagName === "INPUT" && el.type === "checkbox") el.checked = false;
-      else if (el.tagName === "INPUT" && (el.type === "number" || el.type === "text")) el.value = "";
-      else if (el.tagName === "SELECT") el.value = `${BULAN_INI} ${TAHUN_INI}`;
-      else if (el.tagName === "DIV") el.innerHTML = "";
-    }
-  });
-  
-  const formCard = document.getElementById("bayar-form-card");
-  if (formCard) formCard.style.display = "none";
-  
-  const rmdGroup = document.getElementById("bayar-rmd-group");
-  if (rmdGroup) rmdGroup.style.display = "none";
+  if (bayarSearch) bayarSearch.value = "";
+  if (bayarSearchResults) bayarSearchResults.innerHTML = "";
+  if (bayarFormCard) bayarFormCard.style.display = "none";
+  if (bayarNama) bayarNama.textContent = "—";
+  if (bayarNoRumah) bayarNoRumah.textContent = "—";
+  if (tunggakanKas) tunggakanKas.innerHTML = "";
+  if (tunggakanRmd) tunggakanRmd.innerHTML = "";
+  if (bayarTotal) bayarTotal.textContent = "Rp 0";
+  if (bayarGrand) bayarGrand.textContent = "Rp 0";
+  if (bayarJmlKas) bayarJmlKas.value = 0;
+  if (bayarJmlRmd) bayarJmlRmd.value = 0;
+  if (bayarRmdGroup) bayarRmdGroup.style.display = "none";
 }
 
 function doBayarSearch(val) {
@@ -369,45 +373,17 @@ async function pilihAnggotaBayar(id) {
   document.getElementById("bayar-search-results").innerHTML = "";
   document.getElementById("bayar-form-card").style.display = "block";
   
-  // Set checkbox jenis iuran sesuai data anggota
-  const kasCheck = document.getElementById("jenis-kas-checkbox");
-  const rmdCheck = document.getElementById("jenis-rmd-checkbox");
-  if (kasCheck) kasCheck.checked = true;
-  if (rmdCheck) rmdCheck.checked = bayarAnggota.ikut_rmd;
-  
-  const rmdGroup = document.getElementById("bayar-rmd-group");
-  if (rmdGroup) rmdGroup.style.display = bayarAnggota.ikut_rmd ? "block" : "none";
-  
-  // Set pilihan periode tagihan (April 2026, Mei 2026, dll)
-	const periodeSelect = document.getElementById("periode-tagihan");
-	if (periodeSelect && periodeSelect.options.length === 0) {
-	  const now = new Date();
-	  for (let i = 0; i < 6; i++) {
-		const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
-		const bulan = BULAN_LIST[d.getMonth()];
-		const tahun = d.getFullYear();
-		const opt = document.createElement("option");
-		opt.value = `${bulan} ${tahun}`;
-		opt.textContent = `${bulan} ${tahun}`;
-		if (i === 0) opt.selected = true;
-		periodeSelect.appendChild(opt);
-	  }
-	}
-  
   // Load tunggakan
   await loadTunggakan(bayarAnggota.id_anggota);
-
 }
 
 async function loadTunggakan(id) {
   console.log("loadTunggakan:", id);
-  const kasListEl = document.getElementById("tunggakan-kas-list");
-  const kasTotalEl = document.getElementById("tunggakan-kas-total");
-  const rmdListEl = document.getElementById("tunggakan-rmd-list");
-  const rmdTotalEl = document.getElementById("tunggakan-rmd-total");
-  const totalEl = document.getElementById("total-tunggakan");
+  const kasEl = document.getElementById("tunggakan-kas");
+  const rmdEl = document.getElementById("tunggakan-rmd");
+  const totalEl = document.getElementById("bayar-total");
   
-  if (kasListEl) kasListEl.innerHTML = "<div class='loading'>⏳ Memuat tunggakan...</div>";
+  if (kasEl) kasEl.innerHTML = "<div class='loading'>⏳ Memuat tunggakan...</div>";
   
   try {
     const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: id });
@@ -418,28 +394,29 @@ async function loadTunggakan(id) {
       const rmdList = res.data.rmd || [];
       
       // Render Kas
-      if (kasListEl) {
+      if (kasEl) {
         if (kasList.length === 0) {
-          kasListEl.innerHTML = `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`;
+          kasEl.innerHTML = `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`;
         } else {
-          kasListEl.innerHTML = kasList.map(t => `
+          kasEl.innerHTML = kasList.map(t => `
             <div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>
           `).join("");
         }
       }
-      if (kasTotalEl) kasTotalEl.textContent = rp(res.data.total_kas);
       
       // Render RMD
       if (rmdList.length > 0 && res.data.ikut_rmd) {
-        if (rmdListEl) {
-          rmdListEl.innerHTML = rmdList.map(t => `
+        const rmdGroup = document.getElementById("bayar-rmd-group");
+        if (rmdGroup) rmdGroup.style.display = "block";
+        if (rmdEl) {
+          rmdEl.innerHTML = rmdList.map(t => `
             <div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>
           `).join("");
         }
-        if (rmdTotalEl) rmdTotalEl.textContent = rp(res.data.total_rmd);
       } else {
-        if (rmdListEl) rmdListEl.innerHTML = `<div class="empty small">✅ Tidak ada tunggakan RMD</div>`;
-        if (rmdTotalEl) rmdTotalEl.textContent = rp(0);
+        const rmdGroup = document.getElementById("bayar-rmd-group");
+        if (rmdGroup) rmdGroup.style.display = "none";
+        if (rmdEl) rmdEl.innerHTML = "";
       }
       
       if (totalEl) totalEl.textContent = rp(res.data.total_kas + res.data.total_rmd);
@@ -453,12 +430,12 @@ async function loadTunggakan(id) {
       updateTotalBayar();
       showToast(`Tunggakan: ${kasList.length} bulan Kas${rmdList.length > 0 ? `, ${rmdList.length} bulan RMD` : ""}`, "success");
     } else {
-      if (kasListEl) kasListEl.innerHTML = `<div class="empty">Gagal: ${res.message}</div>`;
+      if (kasEl) kasEl.innerHTML = `<div class="empty">Gagal: ${res.message}</div>`;
       showToast(res.message || "Gagal memuat tunggakan", "error");
     }
   } catch(e) {
     console.error(e);
-    if (kasListEl) kasListEl.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+    if (kasEl) kasEl.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
     showToast("Error: " + e.message, "error");
   }
 }
@@ -467,36 +444,18 @@ function updateTotalBayar() {
   const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
   const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
   const total = (jmlKas * (currentTunggakan?.iuran_kas || 0)) + (jmlRmd * (currentTunggakan?.iuran_rmd || 0));
-  document.getElementById("total-dibayar").textContent = rp(total);
-}
-
-function toggleJenisIuran() {
-  const kasChecked = document.getElementById("jenis-kas-checkbox")?.checked || false;
-  const rmdChecked = document.getElementById("jenis-rmd-checkbox")?.checked || false;
-  
-  const kasSection = document.getElementById("kas-section");
-  const rmdSection = document.getElementById("rmd-section");
-  const kasGroup = document.getElementById("bayar-kas-group");
-  const rmdGroup = document.getElementById("bayar-rmd-group");
-  
-  if (kasSection) kasSection.style.display = kasChecked ? "block" : "none";
-  if (rmdSection) rmdSection.style.display = rmdChecked ? "block" : "none";
-  if (kasGroup) kasGroup.style.display = kasChecked ? "block" : "none";
-  if (rmdGroup) rmdGroup.style.display = rmdChecked ? "block" : "none";
-  
-  updateTotalBayar();
+  const grandEl = document.getElementById("bayar-grand");
+  if (grandEl) grandEl.textContent = rp(total);
 }
 
 async function simpanPembayaran() {
   if (!bayarAnggota) { showToast("Pilih anggota terlebih dahulu", "error"); return; }
   
-  const kasChecked = document.getElementById("jenis-kas-checkbox")?.checked || false;
-  const rmdChecked = document.getElementById("jenis-rmd-checkbox")?.checked || false;
   const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
   const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
-  const periode = document.getElementById("periode-tagihan")?.value || `${BULAN_INI} ${TAHUN_INI}`;
+  const periode = `${BULAN_INI} ${TAHUN_INI}`;
   
-  if ((!kasChecked || jmlKas === 0) && (!rmdChecked || jmlRmd === 0)) {
+  if (jmlKas === 0 && jmlRmd === 0) {
     showToast("Pilih minimal 1 bulan untuk dibayar", "error");
     return;
   }
@@ -511,8 +470,8 @@ async function simpanPembayaran() {
       data: {
         id_anggota: bayarAnggota.id_anggota,
         periode_tagihan: periode,
-        jml_bulan_kas: kasChecked ? jmlKas : 0,
-        jml_bulan_rmd: rmdChecked ? jmlRmd : 0,
+        jml_bulan_kas: jmlKas,
+        jml_bulan_rmd: jmlRmd,
         petugas: session?.nama || session?.username
       }
     });
@@ -527,7 +486,7 @@ async function simpanPembayaran() {
   } catch(e) {
     showToast("Error: " + e.message, "error");
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "💾 SUBMIT PEMBAYARAN"; }
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Simpan Pembayaran"; }
   }
 }
 
