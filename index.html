@@ -151,11 +151,58 @@
 
 <!-- ══════════════════════════════════════════ LAPORAN ════════════════ -->
 <div class="page" id="pg-laporan">
-  <div class="topbar"><div class="topbar-row"><div><h1>Laporan Bulanan</h1><div class="sub" id="lap-periode">—</div></div></div></div>
+  <div class="topbar">
+    <div class="topbar-row">
+      <div><h1>Laporan Bulanan</h1><div class="sub" id="lap-periode">—</div></div>
+    </div>
+  </div>
   <div class="page-body">
-    <div class="card"><div class="card-header"><span class="card-title">Filter Periode</span></div><div class="card-body"><div class="form-row"><div class="form-group"><label class="form-label">Bulan</label><select class="form-input" id="lap-filter-bulan"></select></div><div class="form-group"><label class="form-label">Tahun</label><select class="form-input" id="lap-filter-tahun"></select></div></div><button class="btn btn-primary" onclick="terapkanFilterLaporan()">Tampilkan</button></div></div>
-    <div class="stat-grid"><div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="lap-total">—</div></div><div class="stat-box"><div class="stat-label">Lunas</div><div class="stat-val green" id="lap-lunas">—</div></div><div class="stat-box"><div class="stat-label">Belum</div><div class="stat-val red" id="lap-belum">—</div></div><div class="stat-box"><div class="stat-label">Terkumpul</div><div class="stat-val sm green" id="lap-terkumpul">—</div></div></div>
-    <div class="card"><div class="card-header"><span class="card-title">Rincian</span></div><div class="card-body" id="lap-list"><div class="loading">⏳ Memuat…</div></div></div>
+
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">Filter Periode</span></div>
+      <div class="card-body">
+        <div class="form-row" style="margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Bulan</label>
+            <select class="form-input" id="lap-filter-bulan">
+              <option>Januari</option><option>Februari</option><option>Maret</option>
+              <option>April</option><option>Mei</option><option>Juni</option>
+              <option>Juli</option><option>Agustus</option><option>September</option>
+              <option>Oktober</option><option>November</option><option>Desember</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Tahun</label>
+            <select class="form-input" id="lap-filter-tahun"></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="terapkanFilterLaporan()">Tampilkan Laporan</button>
+      </div>
+    </div>
+
+    <!-- Statistik Utama -->
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="lap-total">—</div></div>
+      <div class="stat-box"><div class="stat-label">Lunas</div><div class="stat-val green" id="lap-lunas">—</div></div>
+      <div class="stat-box"><div class="stat-label">Belum Bayar</div><div class="stat-val red" id="lap-belum">—</div></div>
+      <div class="stat-box"><div class="stat-label">Terkumpul</div><div class="stat-val sm green" id="lap-terkumpul">—</div></div>
+    </div>
+
+    <!-- Breakdown Kas, RMD, Grand Total -->
+    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="stat-box"><div class="stat-label">💰 Total Kas</div><div class="stat-val blue" id="lap-total-kas">—</div></div>
+      <div class="stat-box"><div class="stat-label">🏦 Total RMD</div><div class="stat-val blue" id="lap-total-rmd">—</div></div>
+      <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val green" id="lap-grand-total">—</div></div>
+    </div>
+
+    <!-- Rincian Transaksi -->
+    <div class="card">
+      <div class="card-header"><span class="card-title">Rincian Transaksi</span></div>
+      <div class="card-body" id="lap-list">
+        <div class="loading"><div class="spinner"></div> Memuat…</div>
+      </div>
+    </div>
+
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
