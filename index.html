@@ -77,17 +77,22 @@
 
 <!-- ══════════════════════════════════════════ FORM BAYAR ══════════════ -->
 <div class="page" id="pg-bayar">
-  <div class="topbar"><div class="topbar-row"><div><h1>Pembayaran Iuran</h1><div class="sub">Input tunggakan</div></div></div></div>
-  <div class="page-body">
-    <div class="card"><div class="card-header"><span class="card-title">Cari Anggota</span></div><div class="card-body"><div class="search-wrap"><span>🔍</span><input class="search-input" id="bayar-search" type="search" placeholder="Ketik nama / no. rumah…" oninput="doBayarSearch(this.value)"/></div><div id="bayar-search-results"></div></div></div>
-    <div class="card" id="bayar-form-card" style="display:none;"><div class="card-header"><span class="card-title">Detail Tunggakan</span></div><div class="card-body"><div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div><div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div><div class="divider"></div><div id="tunggakan-kas"></div><div id="tunggakan-rmd"></div><div class="total-box"><div class="info-row"><span class="lbl">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div></div><div class="form-group"><label class="form-label">Jumlah Bulan Kas</label><input class="form-input" id="bayar-jml-kas" type="number" min="0" value="0" oninput="updateTotalBayar()"></div><div class="form-group" id="bayar-rmd-group" style="display:none;"><label class="form-label">Jumlah Bulan RMD</label><input class="form-input" id="bayar-jml-rmd" type="number" min="0" value="0" oninput="updateTotalBayar()"></div><div class="info-row"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div><button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()">💾 Simpan Pembayaran</button></div></div>
+  ...
+  <div class="card" id="bayar-form-card" style="display:none;">
+    <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
+    <div class="card-body">
+      <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
+      <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
+      <div class="divider"></div>
+      <div id="tunggakan-kas"></div>
+      <div id="tunggakan-rmd"></div>
+      <div class="total-box"><div class="info-row"><span class="lbl">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div></div>
+      <div class="form-group"><label class="form-label">Jumlah Bulan Kas</label><input class="form-input" id="bayar-jml-kas" type="number" min="0" value="0" oninput="updateTotalBayar()"></div>
+      <div class="form-group" id="bayar-rmd-group" style="display:none;"><label class="form-label">Jumlah Bulan RMD</label><input class="form-input" id="bayar-jml-rmd" type="number" min="0" value="0" oninput="updateTotalBayar()"></div>
+      <div class="info-row"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
+      <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()">💾 Simpan Pembayaran</button>
+    </div>
   </div>
-  <nav class="bottom-nav">
-    <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
-    <button class="nav-item" onclick="goPage('cari')">🔍 Cari</button>
-    <button class="nav-item active" onclick="goPage('bayar')">💰 Bayar</button>
-    <button class="nav-item" onclick="goPage('laporan')">📊 Laporan</button>
-  </nav>
 </div>
 
 <!-- ══════════════════════════════════════════ LAPORAN ════════════════ -->
