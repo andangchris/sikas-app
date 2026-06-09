@@ -296,24 +296,34 @@ let bayarSearchTimer;
 
 function resetBayarForm() {
   bayarAnggota = null;
+  currentTunggakan = null;
   pgState.bayar.data = [];
   pgState.bayar.page = 1;
   
-  const ids = ["bayar-search", "bayar-search-results", "bayar-form-card", "bayar-nama", "bayar-norumah",
-    "tunggakan-kas", "tunggakan-rmd", "bayar-total", "bayar-grand", "bayar-jml-kas", "bayar-jml-rmd", "bayar-rmd-group"];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) {
-      if (el.tagName === "INPUT") el.value = "";
-      else if (el.tagName === "DIV") el.innerHTML = "";
-      else if (el.id === "bayar-form-card") el.style.display = "none";
-      else if (el.id === "bayar-rmd-group") el.style.display = "none";
-      else if (el.id === "bayar-nama") el.textContent = "—";
-      else if (el.id === "bayar-norumah") el.textContent = "—";
-      else if (el.id === "bayar-total") el.textContent = "Rp 0";
-      else if (el.id === "bayar-grand") el.textContent = "Rp 0";
-    }
-  });
+  const searchEl = document.getElementById("bayar-search");
+  if (searchEl) searchEl.value = "";
+  const resultsEl = document.getElementById("bayar-search-results");
+  if (resultsEl) resultsEl.innerHTML = "";
+  const formCard = document.getElementById("bayar-form-card");
+  if (formCard) formCard.style.display = "none";
+  const namaEl = document.getElementById("bayar-nama");
+  if (namaEl) namaEl.textContent = "—";
+  const norumahEl = document.getElementById("bayar-norumah");
+  if (norumahEl) norumahEl.textContent = "—";
+  const kasEl = document.getElementById("tunggakan-kas");
+  if (kasEl) kasEl.innerHTML = "";
+  const rmdEl = document.getElementById("tunggakan-rmd");
+  if (rmdEl) rmdEl.innerHTML = "";
+  const totalEl = document.getElementById("bayar-total");
+  if (totalEl) totalEl.textContent = "Rp 0";
+  const grandEl = document.getElementById("bayar-grand");
+  if (grandEl) grandEl.textContent = "Rp 0";
+  const jmlKasEl = document.getElementById("bayar-jml-kas");
+  if (jmlKasEl) jmlKasEl.value = 0;
+  const jmlRmdEl = document.getElementById("bayar-jml-rmd");
+  if (jmlRmdEl) jmlRmdEl.value = 0;
+  const rmdGroup = document.getElementById("bayar-rmd-group");
+  if (rmdGroup) rmdGroup.style.display = "none";
 }
 
 function doBayarSearch(val) {
@@ -486,10 +496,8 @@ async function simpanPembayaran() {
 // ════════════════════════════════════════════════════════════════════════
 function initFilterLaporan() {
   const selBulan = document.getElementById("lap-filter-bulan");
-  if (selBulan && !selBulan.options.length) {
-    BULAN_LIST.forEach(b => { const opt = document.createElement("option"); opt.value = b; opt.textContent = b; selBulan.appendChild(opt); });
-    selBulan.value = BULAN_INI;
-  }
+  if (selBulan) selBulan.value = BULAN_INI;
+
   const selTahun = document.getElementById("lap-filter-tahun");
   if (selTahun && !selTahun.options.length) {
     for (let y = TAHUN_INI; y >= TAHUN_INI - 3; y--) { const opt = document.createElement("option"); opt.value = y; opt.textContent = y; selTahun.appendChild(opt); }

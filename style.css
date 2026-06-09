@@ -27,29 +27,14 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--c-bg); col
 .login-err { background: var(--c-red-l); color: var(--c-red); padding: 10px; border-radius: 10px; margin-bottom: 16px; font-size: 13px; display: none; }
 
 /* Pastikan halaman login fullscreen dan tidak overlap dengan page lain */
-#pg-login {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 1000 !important;
-  background: linear-gradient(135deg, #0F52A0 0%, #00B4D8 100%) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
 #pg-login.active {
-  display: flex !important;
-}
-
-/* Page lain default */
-.page {
-  display: none;
-  position: relative;
-  min-height: 100vh;
-}
-
-.page.active {
-  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: linear-gradient(135deg, #0F52A0 0%, #00B4D8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Global */
