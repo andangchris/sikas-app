@@ -112,3 +112,28 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--c-bg); col
 
 .hidden { display: none; }
 .mono { font-family: monospace; }
+
+.tunggakan-container {
+  background: var(--c-surface2);
+  border-radius: 12px;
+  padding: 8px;
+  margin-bottom: 12px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.tunggakan-item {
+  background: var(--c-amber-l);
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: 4px 0;
+  font-size: 13px;
+  color: #856404;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.empty.small {
+  padding: 12px;
+  font-size: 12px;
+  text-align: center;
+}
