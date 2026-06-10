@@ -478,7 +478,7 @@ async function pilihAnggotaBayar(id) {
   if (!bayarAnggota) { showToast("Anggota tidak ditemukan", "error"); return; }
   
   //document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_kas)}/bln)`;
-  document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(totalIuranBulanan)}/bln)`;
+  document.getElementById("bayar-nama").textContent = bayarAnggota.nama;
   document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
   document.getElementById("bayar-search").value = bayarAnggota.nama;
   document.getElementById("bayar-search-results").innerHTML = "";
@@ -506,6 +506,8 @@ async function loadTunggakan(id) {
       const iuranKas = Number(res.data.iuran_kas || 0);
 		const iuranRmd = Number(res.data.iuran_rmd || 0);
 		const totalIuranBulanan = iuranKas + iuranRmd;
+		
+		document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(totalIuranBulanan)}/bln)`;
       
       if (kasEl) {
         if (kasList.length === 0) {
