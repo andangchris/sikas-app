@@ -205,3 +205,10 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--c-bg); col
   font-size: 12px;
   text-align: center;
 }
+
+.section-label {
+  font-weight: 600;
+  font-size: 15px;
+  margin: 8px 0 6px;
+  color: var(--c-text);
+}

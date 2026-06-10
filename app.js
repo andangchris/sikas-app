@@ -322,12 +322,18 @@ function renderDashboardList() {
   const pg = paginate(data, page);
   pgState.dashboard.page = pg.curPage;
   el.innerHTML = pg.items.map(t => `
-    <div class="pel-item" onclick="openDetail('${esc(t.id_anggota)}','dashboard')">
+    <div class="pel-item" onclick="openBayarDariDashboard('${esc(t.id_anggota)}')">
       <div class="avatar av-a">${initials(t.nama)}</div>
       <div class="pel-info"><div class="pel-name">${escHtml(t.nama)}</div><div class="pel-sub">No ${escHtml(t.no_rumah)} · ${rp(t.nominal)}</div></div>
       <span class="badge badge-red">Belum</span>
     </div>
   `).join("") + renderPagination("dashboard", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
+  
+  async function openBayarDariDashboard(id) {
+	  goPage("bayar");
+	  await pilihAnggotaBayar(id);
+	}
+
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -375,24 +381,112 @@ function renderSearchResults(list) {
 // ════════════════════════════════════════════════════════════════════════
 //  DETAIL ANGGOTA
 // ════════════════════════════════════════════════════════════════════════
-async function openDetail(id, from = "dashboard") {
+async function openDetail(id, from = "cari") {
   fromPage = from;
+
   if (!allAnggota.length) await prefetchAnggota();
-  const anggota = allAnggota.find(a => a.id_anggota === id);
+
+  const anggota = allAnggota.find(a => String(a.id_anggota) === String(id));
   if (!anggota) return;
+
   currentAnggota = anggota;
-  document.getElementById("detail-nama").textContent = anggota.nama;
-  document.getElementById("detail-norumah").textContent = `No ${anggota.no_rumah}`;
-  document.getElementById("detail-riwayat").innerHTML = "<div class='loading'>⏳ Memuat riwayat…</div>";
+
+  const detailNamaEl = document.getElementById("detail-nama");
+  const detailNoRumahEl = document.getElementById("detail-norumah");
+  const detailRiwayatEl = document.getElementById("detail-riwayat");
+
+  if (detailNamaEl) detailNamaEl.textContent = "Detail Tunggakan";
+  if (detailNoRumahEl) detailNoRumahEl.textContent = anggota.nama;
+  if (detailRiwayatEl) {
+    detailRiwayatEl.innerHTML = "<div class='loading'>⏳ Memuat tunggakan...</div>";
+  }
+
   showPage("pg-detail");
+
   try {
-    const res = await api({ action: "getRiwayat", token: session?.token, id_anggota: id });
-    if (res.status === "ok" && res.data.length) {
-      document.getElementById("detail-riwayat").innerHTML = res.data.map(r => `<div class="info-row"><span class="lbl">${r.jenis_iuran} · ${r.bulan_dibayar} ${r.tahun}</span><span class="val">${rp(r.nominal)}</span></div>`).join("");
-    } else {
-      document.getElementById("detail-riwayat").innerHTML = "<div class='empty'>Belum ada riwayat</div>";
+    const res = await api({
+      action: "getTunggakan",
+      token: session?.token,
+      id_anggota: id
+    });
+
+    if (res.status !== "ok" || !res.data) {
+      detailRiwayatEl.innerHTML = `<div class="empty">Gagal memuat tunggakan</div>`;
+      return;
     }
-  } catch(e) { document.getElementById("detail-riwayat").innerHTML = "<div class='empty'>Error</div>"; }
+
+    const data = res.data;
+    const kasList = data.kas || [];
+    const rmdList = data.rmd || [];
+
+    const iuranKas = Number(data.iuran_kas || 0);
+    const iuranRmd = Number(data.iuran_rmd || 0);
+
+    const totalKas = Number(data.total_kas || 0);
+    const totalRmd = Number(data.total_rmd || 0);
+    const totalTunggakan = totalKas + totalRmd;
+
+    const totalBulanan = iuranKas + iuranRmd;
+
+    let html = `
+      <div class="info-row">
+        <span class="lbl">Anggota</span>
+        <span class="val">${escHtml(anggota.nama)} (${rp(totalBulanan)}/bln)</span>
+      </div>
+
+      <div class="info-row">
+        <span class="lbl">No Rumah</span>
+        <span class="val mono">${escHtml(anggota.no_rumah)}</span>
+      </div>
+
+      <div class="divider"></div>
+    `;
+
+    html += `<div class="tunggakan-container">`;
+
+    if (kasList.length > 0) {
+      html += `<div class="section-label">💰 Kas (${rp(iuranKas)}/bulan)</div>`;
+      html += kasList.map(t => `
+        <div class="tunggakan-item">
+          📅 ${escHtml(t.bulan)} ${escHtml(t.tahun)} - ${rp(t.nominal)} ❌
+        </div>
+      `).join("");
+    } else {
+      html += `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`;
+    }
+
+    html += `</div>`;
+
+    html += `<div class="tunggakan-container">`;
+
+    if (rmdList.length > 0) {
+      html += `<div class="section-label">🏦 RMD (${rp(iuranRmd)}/bulan)</div>`;
+      html += rmdList.map(t => `
+        <div class="tunggakan-item">
+          📅 ${escHtml(t.bulan)} ${escHtml(t.tahun)} - ${rp(t.nominal)} ❌
+        </div>
+      `).join("");
+    } else {
+      html += `<div class="empty small">✅ Tidak ada tunggakan RMD</div>`;
+    }
+
+    html += `</div>`;
+
+    html += `
+      <div class="total-box">
+        <div class="info-row">
+          <span class="lbl" style="font-weight:700;">Total Tunggakan</span>
+          <span class="val total">${rp(totalTunggakan)}</span>
+        </div>
+      </div>
+    `;
+
+    detailRiwayatEl.innerHTML = html;
+
+  } catch (e) {
+    console.error(e);
+    detailRiwayatEl.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════
