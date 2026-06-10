@@ -477,7 +477,8 @@ async function pilihAnggotaBayar(id) {
   bayarAnggota = allAnggota.find(a => a.id_anggota == id);
   if (!bayarAnggota) { showToast("Anggota tidak ditemukan", "error"); return; }
   
-  document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_kas)}/bln)`;
+  //document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_kas)}/bln)`;
+  document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(totalIuranBulanan)}/bln)`;
   document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
   document.getElementById("bayar-search").value = bayarAnggota.nama;
   document.getElementById("bayar-search-results").innerHTML = "";
@@ -502,8 +503,9 @@ async function loadTunggakan(id) {
       currentTunggakan = res.data;
       const kasList = res.data.kas || [];
       const rmdList = res.data.rmd || [];
-      const iuranKas = res.data.iuran_kas;
-      const iuranRmd = res.data.iuran_rmd;
+      const iuranKas = Number(res.data.iuran_kas || 0);
+		const iuranRmd = Number(res.data.iuran_rmd || 0);
+		const totalIuranBulanan = iuranKas + iuranRmd;
       
       if (kasEl) {
         if (kasList.length === 0) {
