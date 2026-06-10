@@ -39,6 +39,8 @@ let allAnggota = [];
 let currentAnggota = null;
 let currentTunggakan = null;
 let fromPage = "dashboard";
+let laporanBelumBayarData = [];
+let laporanPeriodeAktif = "";
 
 const PAGE_SIZE = 3;
 const pgState = {
@@ -723,6 +725,10 @@ async function loadLaporan() {
   });
   const lapList = document.getElementById("lap-list");
   if (lapList) lapList.innerHTML = `<div class="loading">⏳ Memuat…</div>`;
+  
+  const lapBelumList = document.getElementById("lap-belum-list");
+	if (lapBelumList) lapBelumList.innerHTML = `<div class="loading">⏳ Memuat daftar belum bayar…</div>`;
+	
   try {
     const res = await api({ action: "getLaporanPeriode", token: session?.token, periode });
     if (res.status !== "ok") throw new Error(res.message);
@@ -734,9 +740,20 @@ async function loadLaporan() {
     document.getElementById("lap-total-kas").textContent = rp(laporan.total_kas || 0);
     document.getElementById("lap-total-rmd").textContent = rp(laporan.total_rmd || 0);
     document.getElementById("lap-grand-total").textContent = rp((laporan.total_kas || 0) + (laporan.total_rmd || 0));
-    pgState.laporan.data = detail || [];
+    /*
+	pgState.laporan.data = detail || [];
     pgState.laporan.page = 1;
     renderLaporanList();
+	*/
+	pgState.laporan.data = detail || [];
+	pgState.laporan.page = 1;
+
+	laporanPeriodeAktif = periode;
+	laporanBelumBayarData = buatDataBelumBayar(detail || [], periode);
+
+	renderBelumBayarList();
+	renderLaporanList();
+	
   } catch (err) { if (lapList) lapList.innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`; }
 }
 function renderLaporanList() {
@@ -749,6 +766,118 @@ function renderLaporanList() {
   el.innerHTML = pg.items.map(t => `
     <div class="info-row"><div class="pel-info" style="flex:1"><div class="pel-name">${escHtml(t.nama)}</div><div class="pel-sub">No ${escHtml(t.no_rumah)} · ${t.jenis_iuran}</div></div><span class="badge ${t.status === 'Lunas' ? 'badge-green' : 'badge-red'}">${rp(t.nominal)}</span></div>
   `).join("") + renderPagination("laporan", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
+}
+
+function buatDataBelumBayar(detail, periode) {
+  return (detail || [])
+    .filter(t => String(t.status || "").toLowerCase() === "belum bayar")
+    .map((t, index) => ({
+      no: index + 1,
+      nama: t.nama || "-",
+      no_rumah: t.no_rumah || "-",
+      jenis_iuran: t.jenis_iuran || "-",
+      periode: periode || "-",
+      nominal: Number(t.nominal || 0),
+      status: t.status || "Belum Bayar"
+    }));
+}
+
+function renderBelumBayarList() {
+  const el = document.getElementById("lap-belum-list");
+  const btnExport = document.getElementById("btn-export-belum");
+
+  if (!el) return;
+
+  if (!laporanBelumBayarData.length) {
+    el.innerHTML = `<div class="empty"><p>✅ Tidak ada anggota yang belum bayar pada periode ini.</p></div>`;
+    if (btnExport) btnExport.disabled = true;
+    return;
+  }
+
+  if (btnExport) btnExport.disabled = false;
+
+  const totalBelum = laporanBelumBayarData.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+
+  el.innerHTML = `
+    <div class="info-row">
+      <span class="lbl" style="font-weight:700;">Total Belum Bayar</span>
+      <span class="val total">${rp(totalBelum)}</span>
+    </div>
+
+    <div class="divider"></div>
+
+    ${laporanBelumBayarData.map(item => `
+      <div class="info-row">
+        <div class="pel-info" style="flex:1">
+          <div class="pel-name">${escHtml(item.nama)}</div>
+          <div class="pel-sub">
+            No ${escHtml(item.no_rumah)} · ${escHtml(item.jenis_iuran)} · ${escHtml(item.periode)}
+          </div>
+        </div>
+        <span class="badge badge-red">${rp(item.nominal)}</span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function exportBelumBayarExcel() {
+  if (!laporanBelumBayarData.length) {
+    showToast("Tidak ada data belum bayar untuk diexport", "error");
+    return;
+  }
+
+  if (typeof XLSX === "undefined") {
+    showToast("Library Excel belum dimuat", "error");
+    return;
+  }
+
+  const totalBelum = laporanBelumBayarData.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+
+  const rows = laporanBelumBayarData.map((item, index) => ({
+    "No": index + 1,
+    "Nama Anggota": item.nama,
+    "No Rumah": item.no_rumah,
+    "Jenis Iuran": item.jenis_iuran,
+    "Periode": item.periode,
+    "Nominal": item.nominal,
+    "Status": item.status
+  }));
+
+  rows.push({
+    "No": "",
+    "Nama Anggota": "",
+    "No Rumah": "",
+    "Jenis Iuran": "",
+    "Periode": "TOTAL",
+    "Nominal": totalBelum,
+    "Status": ""
+  });
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+
+  worksheet["!cols"] = [
+    { wch: 6 },
+    { wch: 25 },
+    { wch: 12 },
+    { wch: 18 },
+    { wch: 16 },
+    { wch: 14 },
+    { wch: 15 }
+  ];
+
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Belum Bayar");
+
+  const namaFile = `Laporan_Belum_Bayar_${safeFileName(laporanPeriodeAktif)}.xlsx`;
+
+  XLSX.writeFile(workbook, namaFile);
+  showToast("File Excel berhasil dibuat", "success");
+}
+
+function safeFileName(str) {
+  return String(str || "laporan")
+    .replace(/\s+/g, "_")
+    .replace(/[^\w\-]/g, "");
 }
 
 // ════════════════════════════════════════════════════════════════════════

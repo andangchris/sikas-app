@@ -186,6 +186,19 @@
       <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val green" id="lap-grand-total">—</div></div>
     </div>
 
+	<!-- Daftar Belum Bayar -->
+	<div class="card">
+	  <div class="card-header">
+		<span class="card-title">Daftar Belum Bayar</span>
+		<button class="btn btn-outline btn-small" id="btn-export-belum" onclick="exportBelumBayarExcel()">
+		  ⬇️ Export Excel
+		</button>
+	  </div>
+	  <div class="card-body" id="lap-belum-list">
+		<div class="loading">⏳ Memuat…</div>
+	  </div>
+	</div>
+
     <!-- Rincian Transaksi -->
     <div class="card">
       <div class="card-header"><span class="card-title">Rincian Transaksi</span></div>
@@ -212,6 +225,7 @@
 
 <div class="toast" id="toast"></div>
 </div>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -212,3 +212,10 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--c-bg); col
   margin: 8px 0 6px;
   color: var(--c-text);
 }
+
+.btn-small {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+  border-radius: 10px;
+}
