@@ -464,7 +464,10 @@ function renderBayarSearchResults(list) {
   el.innerHTML = pg.items.map(p => `
     <div class="pel-item" onclick="pilihAnggotaBayar('${esc(p.id_anggota)}')" style="cursor:pointer;">
       <div class="avatar av-b">${initials(p.nama)}</div>
-      <div class="pel-info"><div class="pel-name">${escHtml(p.nama)}</div><div class="pel-sub">No ${escHtml(p.no_rumah)} · ${rp(p.iuran_kas)}/bln</div></div>
+		<div class="pel-info">
+		  <div class="pel-name">${escHtml(p.nama)}</div>
+		  <div class="pel-sub">No ${escHtml(p.no_rumah)} · ${rp(totalIuranBulanan(p))}/bln</div>
+		</div>
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
     </div>
   `).join("") + renderPagination("bayar", pg.curPage, pg.totalPages, list.length, pg.start, pg.end);
@@ -478,7 +481,7 @@ async function pilihAnggotaBayar(id) {
   if (!bayarAnggota) { showToast("Anggota tidak ditemukan", "error"); return; }
   
   //document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_kas)}/bln)`;
-  document.getElementById("bayar-nama").textContent = bayarAnggota.nama;
+  document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(totalIuranBulanan(bayarAnggota))}/bln)`;
   document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
   document.getElementById("bayar-search").value = bayarAnggota.nama;
   document.getElementById("bayar-search-results").innerHTML = "";
@@ -692,4 +695,18 @@ function showToast(msg, type = "") {
   el.className = "toast show" + (type ? " " + type : "");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = "toast"; }, 2800);
+}
+
+function totalIuranBulanan(p) {
+  const kas = Number(p?.iuran_kas || 0);
+
+  const ikutRmd =
+    p?.ikut_rmd === true ||
+    String(p?.ikut_rmd || "").toLowerCase() === "true" ||
+    String(p?.ikut_rmd || "").toLowerCase() === "ya" ||
+    String(p?.ikut_rmd || "").toLowerCase() === "y";
+
+  const rmd = ikutRmd ? Number(p?.iuran_rmd || 0) : 0;
+
+  return kas + rmd;
 }
