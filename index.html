@@ -206,39 +206,8 @@
 <!-- ══════════════════════════════════════════ DETAIL ANGGOTA ══════════ -->
 <div class="page" id="pg-detail">
   <div class="topbar"><button class="back-btn" onclick="goBack()">← Kembali</button><div><h1 id="detail-nama">—</h1><div class="sub" id="detail-norumah">—</div></div></div>
-  <!--div class="page-body"><div class="card"><div class="card-header"><span class="card-title">Riwayat Iuran</span></div><div class="card-body" id="detail-riwayat"></div></div></div-->
-  
-  <div class="card-body">
-        <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
-        <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
-        <div class="divider"></div>
-        
-        <!-- Sisa tunggakan KAS -->
-        <div id="tunggakan-kas" class="tunggakan-container"></div>
-        
-        <!-- Sisa tunggakan RMD -->
-        <div id="tunggakan-rmd" class="tunggakan-container"></div>
-        
-        <div class="total-box">
-          <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Jumlah Bulan Kas yang Dibayar</label>
-            <input class="form-input" id="bayar-jml-kas" type="number" min="0" value="0" oninput="updateTotalBayar()">
-          </div>
-          <div class="form-group" id="bayar-rmd-group" style="display:none;">
-            <label class="form-label">Jumlah Bulan RMD yang Dibayar</label>
-            <input class="form-input" id="bayar-jml-rmd" type="number" min="0" value="0" oninput="updateTotalBayar()">
-          </div>
-        </div>
-        
-        <div class="info-row" style="margin-top:12px;"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
-        
-        <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;margin-top:16px;">💾 Simpan Pembayaran</button>
-      </div>
-  
+  <div class="page-body"><div class="card"><div class="card-header"><span class="card-title">Riwayat Iuran</span></div><div class="card-body" id="detail-riwayat"></div></div></div>
+    
 </div>
 
 <div class="toast" id="toast"></div>
