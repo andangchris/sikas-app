@@ -329,11 +329,11 @@ function renderDashboardList() {
     </div>
   `).join("") + renderPagination("dashboard", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
   
-  async function openBayarDariDashboard(id) {
-	  goPage("bayar");
-	  await pilihAnggotaBayar(id);
-	}
+}
 
+async function openBayarDariDashboard(id) {
+  goPage("bayar");
+  await pilihAnggotaBayar(id);
 }
 
 // ════════════════════════════════════════════════════════════════════════
