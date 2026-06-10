@@ -749,9 +749,11 @@ async function loadLaporan() {
 	pgState.laporan.page = 1;
 
 	laporanPeriodeAktif = periode;
-	laporanBelumBayarData = buatDataBelumBayar(detail || [], periode);
+	//laporanBelumBayarData = buatDataBelumBayar(detail || [], periode);
 
-	renderBelumBayarList();
+	//renderBelumBayarList();
+	laporanBelumBayarData = await buatDataBelumBayarDetail(detail || [], periode);
+	renderBelumBayarListDetail();
 	renderLaporanList();
 	
   } catch (err) { if (lapList) lapList.innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`; }
@@ -768,6 +770,7 @@ function renderLaporanList() {
   `).join("") + renderPagination("laporan", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
 }
 
+/*
 function buatDataBelumBayar(detail, periode) {
   return (detail || [])
     .filter(t => String(t.status || "").toLowerCase() === "belum bayar")
@@ -780,6 +783,76 @@ function buatDataBelumBayar(detail, periode) {
       nominal: Number(t.nominal || 0),
       status: t.status || "Belum Bayar"
     }));
+}
+*/
+
+async function buatDataBelumBayarDetail(detail, periode) {
+  const results = [];
+  for (const t of detail) {
+    if ((t.status || "").toLowerCase() !== "belum bayar") continue;
+
+    // Ambil tunggakan Kas & RMD dari API
+    let tunggakan = { kas: [], rmd: [], iuran_kas: 0, iuran_rmd: 0, total_kas: 0, total_rmd: 0 };
+    try {
+      const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: t.id_anggota });
+      if (res.status === "ok" && res.data) {
+        tunggakan = res.data;
+      }
+    } catch (e) {
+      console.error(`Gagal memuat tunggakan untuk ${t.nama}:`, e);
+    }
+
+    const totalTunggakan = (tunggakan.total_kas || 0) + (tunggakan.total_rmd || 0);
+
+    results.push({
+      no: results.length + 1,
+      id_anggota: t.id_anggota,
+      nama: t.nama || "-",
+      no_rumah: t.no_rumah || "-",
+      periode: periode || "-",
+      kas: tunggakan.kas || [],
+      rmd: tunggakan.rmd || [],
+      iuran_kas: tunggakan.iuran_kas || 0,
+      iuran_rmd: tunggakan.iuran_rmd || 0,
+      total: totalTunggakan
+    });
+  }
+  return results;
+}
+
+function renderBelumBayarListDetail() {
+  const el = document.getElementById("lap-belum-list");
+  const btnExport = document.getElementById("btn-export-belum");
+
+  if (!el) return;
+
+  if (!laporanBelumBayarData.length) {
+    el.innerHTML = `<div class="empty"><p>✅ Tidak ada anggota yang belum bayar pada periode ini.</p></div>`;
+    if (btnExport) btnExport.disabled = true;
+    return;
+  }
+
+  if (btnExport) btnExport.disabled = false;
+
+  let html = "";
+
+  laporanBelumBayarData.forEach(item => {
+    html += `
+      <div class="info-row">
+        <span class="lbl">${escHtml(item.nama)} (No ${escHtml(item.no_rumah)})</span>
+        <span class="val total">${rp(item.total)}</span>
+      </div>
+      <div class="tunggakan-container">
+        ${item.kas.length > 0 ? `<div class="section-label">💰 Kas (${rp(item.iuran_kas)}/bulan)</div>` : ""}
+        ${item.kas.map(k => `<div class="tunggakan-item">📅 ${escHtml(k.bulan)} ${escHtml(k.tahun)} — ${rp(k.nominal)}</div>`).join("")}
+        ${item.rmd.length > 0 ? `<div class="section-label">🏦 RMD (${rp(item.iuran_rmd)}/bulan)</div>` : ""}
+        ${item.rmd.map(r => `<div class="tunggakan-item">📅 ${escHtml(r.bulan)} ${escHtml(r.tahun)} — ${rp(r.nominal)}</div>`).join("")}
+      </div>
+      <div class="divider"></div>
+    `;
+  });
+
+  el.innerHTML = html;
 }
 
 function renderBelumBayarList() {
@@ -831,47 +904,53 @@ function exportBelumBayarExcel() {
     return;
   }
 
-  const totalBelum = laporanBelumBayarData.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+  const rows = [];
 
-  const rows = laporanBelumBayarData.map((item, index) => ({
-    "No": index + 1,
-    "Nama Anggota": item.nama,
-    "No Rumah": item.no_rumah,
-    "Jenis Iuran": item.jenis_iuran,
-    "Periode": item.periode,
-    "Nominal": item.nominal,
-    "Status": item.status
-  }));
-
-  rows.push({
-    "No": "",
-    "Nama Anggota": "",
-    "No Rumah": "",
-    "Jenis Iuran": "",
-    "Periode": "TOTAL",
-    "Nominal": totalBelum,
-    "Status": ""
+  laporanBelumBayarData.forEach((item, index) => {
+    // Tambahkan baris untuk KAS
+    item.kas.forEach(k => {
+      rows.push({
+        "No": index + 1,
+        "Nama Anggota": item.nama,
+        "No Rumah": item.no_rumah,
+        "Jenis Iuran": "Kas",
+        "Bulan": k.bulan,
+        "Tahun": k.tahun,
+        "Nominal": k.nominal
+      });
+    });
+    // Tambahkan baris untuk RMD
+    item.rmd.forEach(r => {
+      rows.push({
+        "No": index + 1,
+        "Nama Anggota": item.nama,
+        "No Rumah": item.no_rumah,
+        "Jenis Iuran": "RMD",
+        "Bulan": r.bulan,
+        "Tahun": r.tahun,
+        "Nominal": r.nominal
+      });
+    });
+    // Tambahkan total per anggota
+    rows.push({
+      "No": "",
+      "Nama Anggota": "",
+      "No Rumah": "",
+      "Jenis Iuran": "TOTAL",
+      "Bulan": "",
+      "Tahun": "",
+      "Nominal": item.total
+    });
   });
 
   const worksheet = XLSX.utils.json_to_sheet(rows);
-
-  worksheet["!cols"] = [
-    { wch: 6 },
-    { wch: 25 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 15 }
-  ];
-
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Belum Bayar");
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Belum Bayar Detail");
 
-  const namaFile = `Laporan_Belum_Bayar_${safeFileName(laporanPeriodeAktif)}.xlsx`;
-
+  const namaFile = `Laporan_Belum_Bayar_Detail_${safeFileName(laporanPeriodeAktif)}.xlsx`;
   XLSX.writeFile(workbook, namaFile);
-  showToast("File Excel berhasil dibuat", "success");
+
+  showToast("File Excel detail berhasil dibuat", "success");
 }
 
 function safeFileName(str) {
@@ -933,3 +1012,4 @@ function totalIuranBulanan(p) {
 
   return kas + rmd;
 }
+
