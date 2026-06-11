@@ -720,15 +720,11 @@ async function loadLaporan() {
   const tahun = document.getElementById("lap-filter-tahun")?.value || TAHUN_INI;
   const periode = `${bulan} ${tahun}`;
   document.getElementById("lap-periode").textContent = periode;
-  ["lap-total","lap-lunas","lap-belum","lap-terkumpul","lap-total-kas","lap-total-rmd","lap-grand-total"].forEach(id => { 
+  ["lap-total","lap-lunas","lap-belum","lap-total-kas","lap-total-rmd","lap-grand-total"].forEach(id => { 
     const el = document.getElementById(id); if (el) el.textContent = "…"; 
   });
   const lapList = document.getElementById("lap-list");
   if (lapList) lapList.innerHTML = `<div class="loading">⏳ Memuat…</div>`;
-  
-  const lapBelumList = document.getElementById("lap-belum-list");
-	if (lapBelumList) lapBelumList.innerHTML = `<div class="loading">⏳ Memuat daftar belum bayar…</div>`;
-	
   try {
     const res = await api({ action: "getLaporanPeriode", token: session?.token, periode });
     if (res.status !== "ok") throw new Error(res.message);
@@ -736,35 +732,34 @@ async function loadLaporan() {
     document.getElementById("lap-total").textContent = laporan.total_anggota;
     document.getElementById("lap-lunas").textContent = laporan.sudah_bayar;
     document.getElementById("lap-belum").textContent = laporan.belum_bayar;
-    document.getElementById("lap-terkumpul").textContent = rp(laporan.total_terkumpul);
     document.getElementById("lap-total-kas").textContent = rp(laporan.total_kas || 0);
     document.getElementById("lap-total-rmd").textContent = rp(laporan.total_rmd || 0);
     document.getElementById("lap-grand-total").textContent = rp((laporan.total_kas || 0) + (laporan.total_rmd || 0));
-    /*
-	pgState.laporan.data = detail || [];
+
+    // Hanya tampilkan transaksi Lunas di Rincian Transaksi
+    const lunas = (detail || []).filter(t => t.status === "Lunas");
+    pgState.laporan.data = lunas;
     pgState.laporan.page = 1;
+    laporanPeriodeAktif = periode;
+
+    // Simpan data belum bayar untuk keperluan export
+    laporanBelumBayarData = buatDataBelumBayar(detail || [], periode);
+
+    const btnExport = document.getElementById("btn-export-belum");
+    if (btnExport) btnExport.disabled = laporanBelumBayarData.length === 0;
+
     renderLaporanList();
-	*/
-	pgState.laporan.data = detail || [];
-	pgState.laporan.page = 1;
-
-	laporanPeriodeAktif = periode;
-	laporanBelumBayarData = buatDataBelumBayar(detail || [], periode);
-
-	renderBelumBayarList();
-	renderLaporanList();
-	
   } catch (err) { if (lapList) lapList.innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`; }
 }
 function renderLaporanList() {
   const { data, page } = pgState.laporan;
   const el = document.getElementById("lap-list");
   if (!el) return;
-  if (!data.length) { el.innerHTML = `<div class="empty"><p>Tidak ada data</p></div>`; return; }
+  if (!data.length) { el.innerHTML = `<div class="empty"><p>Tidak ada transaksi pada periode ini</p></div>`; return; }
   const pg = paginate(data, page);
   pgState.laporan.page = pg.curPage;
   el.innerHTML = pg.items.map(t => `
-    <div class="info-row"><div class="pel-info" style="flex:1"><div class="pel-name">${escHtml(t.nama)}</div><div class="pel-sub">No ${escHtml(t.no_rumah)} · ${t.jenis_iuran}</div></div><span class="badge ${t.status === 'Lunas' ? 'badge-green' : 'badge-red'}">${rp(t.nominal)}</span></div>
+    <div class="info-row"><div class="pel-info" style="flex:1"><div class="pel-name">${escHtml(t.nama)}</div><div class="pel-sub">No ${escHtml(t.no_rumah)} · ${escHtml(t.jenis_iuran)} · ${escHtml(t.bulan_dibayar || "")} ${escHtml(String(t.tahun || ""))}</div></div><span class="badge badge-green">${rp(t.nominal)}</span></div>
   `).join("") + renderPagination("laporan", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
 }
 
@@ -782,96 +777,96 @@ function buatDataBelumBayar(detail, periode) {
     }));
 }
 
-function renderBelumBayarList() {
-  const el = document.getElementById("lap-belum-list");
-  const btnExport = document.getElementById("btn-export-belum");
 
-  if (!el) return;
-
-  if (!laporanBelumBayarData.length) {
-    el.innerHTML = `<div class="empty"><p>✅ Tidak ada anggota yang belum bayar pada periode ini.</p></div>`;
-    if (btnExport) btnExport.disabled = true;
-    return;
-  }
-
-  if (btnExport) btnExport.disabled = false;
-
-  const totalBelum = laporanBelumBayarData.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
-
-  el.innerHTML = `
-    <div class="info-row">
-      <span class="lbl" style="font-weight:700;">Total Belum Bayar</span>
-      <span class="val total">${rp(totalBelum)}</span>
-    </div>
-
-    <div class="divider"></div>
-
-    ${laporanBelumBayarData.map(item => `
-      <div class="info-row">
-        <div class="pel-info" style="flex:1">
-          <div class="pel-name">${escHtml(item.nama)}</div>
-          <div class="pel-sub">
-            No ${escHtml(item.no_rumah)} · ${escHtml(item.jenis_iuran)} · ${escHtml(item.periode)}
-          </div>
-        </div>
-        <span class="badge badge-red">${rp(item.nominal)}</span>
-      </div>
-    `).join("")}
-  `;
-}
-
-function exportBelumBayarExcel() {
+async function exportBelumBayarExcel() {
   if (!laporanBelumBayarData.length) {
     showToast("Tidak ada data belum bayar untuk diexport", "error");
     return;
   }
-
   if (typeof XLSX === "undefined") {
     showToast("Library Excel belum dimuat", "error");
     return;
   }
 
-  const totalBelum = laporanBelumBayarData.reduce((sum, item) => sum + Number(item.nominal || 0), 0);
+  const btn = document.getElementById("btn-export-belum");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Menyiapkan..."; }
 
-  const rows = laporanBelumBayarData.map((item, index) => ({
-    "No": index + 1,
-    "Nama Anggota": item.nama,
-    "No Rumah": item.no_rumah,
-    "Jenis Iuran": item.jenis_iuran,
-    "Periode": item.periode,
-    "Nominal": item.nominal,
-    "Status": item.status
-  }));
+  try {
+    // Ambil daftar unik anggota yang belum bayar
+    const anggotaBelum = [];
+    const seen = new Set();
+    for (const item of laporanBelumBayarData) {
+      const key = String(item.no_rumah);
+      if (!seen.has(key)) {
+        seen.add(key);
+        anggotaBelum.push({ no_rumah: key, nama: item.nama });
+      }
+    }
 
-  rows.push({
-    "No": "",
-    "Nama Anggota": "",
-    "No Rumah": "",
-    "Jenis Iuran": "",
-    "Periode": "TOTAL",
-    "Nominal": totalBelum,
-    "Status": ""
-  });
+    // Fetch tunggakan detail per anggota (per bulan)
+    const rows = [];
+    let no = 1;
 
-  const worksheet = XLSX.utils.json_to_sheet(rows);
+    for (const ang of anggotaBelum) {
+      try {
+        const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: ang.no_rumah });
+        if (res.status === "ok" && res.data) {
+          const kasList = res.data.kas || [];
+          const rmdList = res.data.rmd || [];
 
-  worksheet["!cols"] = [
-    { wch: 6 },
-    { wch: 25 },
-    { wch: 12 },
-    { wch: 18 },
-    { wch: 16 },
-    { wch: 14 },
-    { wch: 15 }
-  ];
+          for (const t of kasList) {
+            rows.push({
+              "No": no++,
+              "Nama Anggota": ang.nama,
+              "No Rumah": ang.no_rumah,
+              "Jenis Iuran": "Kas",
+              "Bulan Tunggakan": `${t.bulan} ${t.tahun}`,
+              "Nominal": t.nominal,
+              "Status": "Belum Bayar"
+            });
+          }
+          for (const t of rmdList) {
+            rows.push({
+              "No": no++,
+              "Nama Anggota": ang.nama,
+              "No Rumah": ang.no_rumah,
+              "Jenis Iuran": "RMD",
+              "Bulan Tunggakan": `${t.bulan} ${t.tahun}`,
+              "Nominal": t.nominal,
+              "Status": "Belum Bayar"
+            });
+          }
+        }
+      } catch(e) { console.error("Gagal fetch tunggakan", ang.nama, e); }
+    }
 
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Belum Bayar");
+    if (!rows.length) {
+      showToast("Tidak ada detail tunggakan ditemukan", "error");
+      return;
+    }
 
-  const namaFile = `Laporan_Belum_Bayar_${safeFileName(laporanPeriodeAktif)}.xlsx`;
+    // Baris total
+    const grandTotal = rows.reduce((s, r) => s + Number(r["Nominal"] || 0), 0);
+    rows.push({
+      "No": "", "Nama Anggota": "", "No Rumah": "", "Jenis Iuran": "",
+      "Bulan Tunggakan": "TOTAL", "Nominal": grandTotal, "Status": ""
+    });
 
-  XLSX.writeFile(workbook, namaFile);
-  showToast("File Excel berhasil dibuat", "success");
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 5 }, { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 20 }, { wch: 14 }, { wch: 14 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Belum Bayar");
+    XLSX.writeFile(workbook, `Tunggakan_Belum_Bayar_${safeFileName(laporanPeriodeAktif)}.xlsx`);
+    showToast("File Excel berhasil dibuat", "success");
+
+  } catch(e) {
+    showToast("Gagal export: " + e.message, "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "⬇️ Export Belum Bayar"; }
+  }
 }
 
 function safeFileName(str) {
