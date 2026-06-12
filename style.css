@@ -219,3 +219,11 @@ body { font-family: 'Inter', system-ui, sans-serif; background: var(--c-bg); col
   font-size: 12px;
   border-radius: 10px;
 }
+
+/* ── Cari Anggota Filter ── */
+#cari-info {
+  font-size: 12px;
+  color: var(--c-text2);
+  margin-bottom: 8px;
+  padding: 6px 4px;
+}

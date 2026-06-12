@@ -12,7 +12,7 @@
 <body>
 <div id="app">
 
-<!-- ══════════════════════════════════════════ LOGIN ═══════════════════ -->
+<!-- ══════════════════════════ LOGIN ══════════════════════════ -->
 <div class="page" id="pg-login">
   <div class="login-logo">
     <div class="drop">💰</div>
@@ -34,7 +34,7 @@
   </div>
 </div>
 
-<!-- ══════════════════════════════════════════ DASHBOARD ═══════════════ -->
+<!-- ══════════════════════════ DASHBOARD ══════════════════════ -->
 <div class="page" id="pg-dashboard">
   <div class="topbar">
     <div class="topbar-row">
@@ -43,14 +43,28 @@
     </div>
   </div>
   <div class="page-body">
+    <!-- Statistik ringkas -->
     <div class="stat-grid">
       <div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="s-total">—</div></div>
       <div class="stat-box"><div class="stat-label">Sudah Bayar</div><div class="stat-val green" id="s-lunas">—</div></div>
       <div class="stat-box"><div class="stat-label">Belum Bayar</div><div class="stat-val red" id="s-belum">—</div></div>
       <div class="stat-box"><div class="stat-label">Terkumpul</div><div class="stat-val sm blue" id="s-nominal">—</div></div>
     </div>
-    <div class="card"><div class="card-body"><div class="stat-label">Progress bulan ini</div><div class="progress-wrap"><div class="progress-fill" id="s-progress" style="width:0%"></div></div><div style="text-align:right;font-size:11px;margin-top:4px;" id="s-pct">0%</div></div></div>
-    <div class="card"><div class="card-header"><span class="card-title">Belum Bayar</span></div><div class="card-body" id="dash-belum-list"><div class="loading">⏳ Memuat…</div></div></div>
+    <!-- Progress -->
+    <div class="card">
+      <div class="card-body">
+        <div class="stat-label">Progress bulan ini</div>
+        <div class="progress-wrap"><div class="progress-fill" id="s-progress" style="width:0%"></div></div>
+        <div style="text-align:right;font-size:11px;margin-top:4px;" id="s-pct">0%</div>
+      </div>
+    </div>
+    <!-- Shortcut ke Cari -->
+    <div class="card">
+      <div class="card-body" style="display:flex;gap:12px;">
+        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('belum')">📋 Lihat Belum Bayar</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('lunas')">✅ Lihat Sudah Bayar</button>
+      </div>
+    </div>
   </div>
   <nav class="bottom-nav">
     <button class="nav-item active" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -60,12 +74,61 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════════════════════ CARI ANGGOTA ════════════ -->
+<!-- ══════════════════════════ CARI ANGGOTA (baru) ════════════ -->
 <div class="page" id="pg-cari">
-  <div class="topbar"><div class="topbar-row"><div><h1>Cari Anggota</h1><div class="sub">Ketik nama atau nomor rumah</div></div></div></div>
+  <div class="topbar">
+    <div class="topbar-row">
+      <div><h1>Cari Anggota</h1><div class="sub">Filter nama, no. rumah & status</div></div>
+    </div>
+  </div>
   <div class="page-body">
-    <div class="search-wrap"><span>🔍</span><input class="search-input" id="search-input" type="search" placeholder="Cari..." oninput="doSearch(this.value)"/></div>
-    <div id="search-results"></div>
+
+    <!-- Panel Filter -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-body">
+        <!-- Keyword -->
+        <div class="search-wrap" style="margin-bottom:12px;">
+          <span>🔍</span>
+          <input class="search-input" id="cari-keyword" type="search" placeholder="Nama / no. rumah (kosongkan = semua)"/>
+        </div>
+        <!-- Filter baris -->
+        <div class="form-row" style="margin-bottom:12px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Status</label>
+            <select class="form-input" id="cari-filter-status">
+              <option value="semua">Semua</option>
+              <option value="belum">Belum Bayar</option>
+              <option value="lunas">Sudah Bayar</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Bulan</label>
+            <select class="form-input" id="cari-filter-bulan">
+              <option>Januari</option><option>Februari</option><option>Maret</option>
+              <option>April</option><option>Mei</option><option>Juni</option>
+              <option>Juli</option><option>Agustus</option><option>September</option>
+              <option>Oktober</option><option>November</option><option>Desember</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label class="form-label">Tahun</label>
+            <select class="form-input" id="cari-filter-tahun"></select>
+          </div>
+        </div>
+        <!-- Tombol aksi -->
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" style="flex:1;" onclick="doCariFilter()">🔍 Cari</button>
+          <button class="btn btn-outline btn-small" id="btn-export-cari" onclick="exportCariExcel()" disabled>⬇️ Export Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info hasil -->
+    <div id="cari-info" style="font-size:12px;color:var(--c-text2);margin-bottom:8px;display:none;"></div>
+
+    <!-- Hasil -->
+    <div id="cari-results"></div>
+
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -75,16 +138,14 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════════════════════ FORM BAYAR ═══════════════ -->
+<!-- ══════════════════════════ FORM BAYAR ═════════════════════ -->
 <div class="page" id="pg-bayar">
   <div class="topbar">
     <div class="topbar-row">
-      <div><h1>Form Pembayaran</h1><div class="sub">Input iuran kas & RMD</div></div>
+      <div><h1>Form Pembayaran</h1><div class="sub">Input iuran kas &amp; RMD</div></div>
     </div>
   </div>
   <div class="page-body">
-
-    <!-- Pilih Anggota -->
     <div class="card">
       <div class="card-header"><span class="card-title">Cari Anggota</span></div>
       <div class="card-body">
@@ -95,25 +156,17 @@
         <div id="bayar-search-results"></div>
       </div>
     </div>
-
-    <!-- Form Pembayaran (muncul setelah pilih anggota) -->
     <div class="card" id="bayar-form-card" style="display:none;">
       <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
       <div class="card-body">
         <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
         <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
         <div class="divider"></div>
-        
-        <!-- Sisa tunggakan KAS -->
         <div id="tunggakan-kas" class="tunggakan-container"></div>
-        
-        <!-- Sisa tunggakan RMD -->
         <div id="tunggakan-rmd" class="tunggakan-container"></div>
-        
         <div class="total-box">
           <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div>
         </div>
-        
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">Jumlah Bulan Kas yang Dibayar</label>
@@ -124,13 +177,10 @@
             <input class="form-input" id="bayar-jml-rmd" type="number" min="0" placeholder="0" oninput="updateTotalBayar()">
           </div>
         </div>
-        
         <div class="info-row" style="margin-top:12px;"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
-        
         <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;margin-top:16px;">💾 Simpan Pembayaran</button>
       </div>
     </div>
-
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -140,7 +190,7 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════════════════════ LAPORAN ════════════════ -->
+<!-- ══════════════════════════ LAPORAN ════════════════════════ -->
 <div class="page" id="pg-laporan">
   <div class="topbar">
     <div class="topbar-row">
@@ -148,7 +198,6 @@
     </div>
   </div>
   <div class="page-body">
-
     <div class="card" style="margin-bottom:12px;">
       <div class="card-header"><span class="card-title">Filter Periode</span></div>
       <div class="card-body">
@@ -170,34 +219,23 @@
         <button class="btn btn-primary" onclick="terapkanFilterLaporan()">Tampilkan Laporan</button>
       </div>
     </div>
-
-    <!-- Statistik Utama -->
     <div class="stat-grid">
       <div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="lap-total">—</div></div>
       <div class="stat-box"><div class="stat-label">Lunas</div><div class="stat-val green" id="lap-lunas">—</div></div>
       <div class="stat-box"><div class="stat-label">Belum Bayar</div><div class="stat-val red" id="lap-belum">—</div></div>
     </div>
-
-    <!-- Breakdown Kas, RMD, Grand Total -->
     <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
-      <div class="stat-box"><div class="stat-label">💰 Total Kas</div><div class="stat-val blue" id="lap-total-kas">—</div></div>
-      <div class="stat-box"><div class="stat-label">🏦 Total RMD</div><div class="stat-val blue" id="lap-total-rmd">—</div></div>
-      <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val green" id="lap-grand-total">—</div></div>
+      <div class="stat-box"><div class="stat-label">💰 Total Kas</div><div class="stat-val sm blue" id="lap-total-kas">—</div></div>
+      <div class="stat-box"><div class="stat-label">🏦 Total RMD</div><div class="stat-val sm blue" id="lap-total-rmd">—</div></div>
+      <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val sm green" id="lap-grand-total">—</div></div>
     </div>
-
-	<!-- Rincian Transaksi -->
-    <div class="card">
+    <!--div class="card">
       <div class="card-header">
         <span class="card-title">Rincian Transaksi</span>
-        <button class="btn btn-outline btn-small" id="btn-export-belum" onclick="exportBelumBayarExcel()">
-          ⬇️ Export Belum Bayar
-        </button>
+        <button class="btn btn-outline btn-small" id="btn-export-belum" onclick="exportBelumBayarExcel()">⬇️ Export Belum Bayar</button>
       </div>
-      <div class="card-body" id="lap-list">
-        <div class="loading"><div class="spinner"></div> Memuat…</div>
-      </div>
-    </div>
-
+      <div class="card-body" id="lap-list"><div class="loading">⏳ Memuat…</div></div>
+    </div-->
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -207,11 +245,18 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════════════════════ DETAIL ANGGOTA ══════════ -->
+<!-- ══════════════════════════ DETAIL ANGGOTA ════════════════ -->
 <div class="page" id="pg-detail">
-  <div class="topbar"><button class="back-btn" onclick="goBack()">← Kembali</button><div><h1 id="detail-nama">—</h1><div class="sub" id="detail-norumah">—</div></div></div>
-  <div class="page-body"><div class="card"><div class="card-header"><span class="card-title">Detail Tunggakan</span></div><div class="card-body" id="detail-riwayat"></div></div></div>
-    
+  <div class="topbar">
+    <button class="back-btn" onclick="goBack()">← Kembali</button>
+    <div><h1 id="detail-nama">—</h1><div class="sub" id="detail-norumah">—</div></div>
+  </div>
+  <div class="page-body">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
+      <div class="card-body" id="detail-riwayat"></div>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>
