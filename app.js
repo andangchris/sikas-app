@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════
    SiKAS — app.js
+   Mendukung 4 jenis iuran: Kas, RMD, Konsumsi, Dana 17n
 ═══════════════════════════════════════════════ */
 
-const API_URL = "https://script.google.com/macros/s/AKfycbz15tx96rwW4vZwT0omJpkjKQPhjRzJ0rYEzngZU27HMb47ZpIcxpoLSvJGCTmSSJTN/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbw7UpRL4jBPxjn8o55nqjMhINiGrpxLg6D3wk4NFBFLquqfMXudabNaLkBQad4uXrlC/exec";
 
 const BULAN_LIST = ["Januari","Februari","Maret","April","Mei","Juni",
                     "Juli","Agustus","September","Oktober","November","Desember"];
@@ -15,7 +16,7 @@ const CACHE_EXPIRY = 60 * 60 * 1000;
 let logoutTimer    = null;
 
 function setCache(key, data) {
-  localStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify({ timestamp: Date.now(), data }));
+  try { localStorage.setItem(`${CACHE_KEY}_${key}`, JSON.stringify({ timestamp: Date.now(), data })); } catch(e) {}
 }
 function getCache(key) {
   try {
@@ -27,7 +28,7 @@ function getCache(key) {
   } catch(e) { return null; }
 }
 function clearCache() {
-  Object.keys(localStorage).forEach(k => { if (k.startsWith(CACHE_KEY)) localStorage.removeItem(k); });
+  try { Object.keys(localStorage).forEach(k => { if (k.startsWith(CACHE_KEY)) localStorage.removeItem(k); }); } catch(e) {}
 }
 
 // ── STATE ────────────────────────────────────────────────────────────────
@@ -36,17 +37,29 @@ let allAnggota       = [];
 let currentAnggota   = null;
 let currentTunggakan = null;
 let fromPage         = "cari";
-let cariData         = [];          // hasil cariAnggotaFilter terakhir
-let laporanBelumBayarData = [];
-let laporanPeriodeAktif   = "";
+let cariData         = [];
+let laporanPeriodeAktif = "";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 5;
 const pgState = {
   dashboard: { page: 1, data: [] },
   cari:      { page: 1, data: [] },
   bayar:     { page: 1, data: [] },
   laporan:   { page: 1, data: [] },
 };
+
+function hasIuranWajib(a) {
+  return !!(a && (a.ikut_kas || a.ikut_rmd || a.ikut_konsumsi || a.ikut_dana_17n));
+}
+function matchAnggotaKeyword(a, kw) {
+  const key = String(kw || "").toLowerCase().trim();
+  if (!key) return true;
+  return String(a.no_rumah || "").toLowerCase().includes(key) ||
+         String(a.nama || "").toLowerCase().includes(key);
+}
+function statusWargaLabel(a) {
+  return Number(a?.aktif) === 1 ? "Aktif" : "Nonaktif";
+}
 
 // ════════════════════════════════════════════════════════════════════════
 //  AUTO LOGOUT
@@ -160,12 +173,7 @@ function goPage(page) {
   if (page === "bayar")     resetBayarForm();
 }
 function goBack() { showPage(fromPage === "bayar" ? "pg-bayar" : "pg-cari"); }
-
-// shortcut dari dashboard ke halaman Cari dengan filter pre-set
-function goPageCari(statusFilter) {
-  showPage("pg-cari");
-  initCariPage(statusFilter);
-}
+function goPageCari(statusFilter) { showPage("pg-cari"); initCariPage(statusFilter); }
 
 // ════════════════════════════════════════════════════════════════════════
 //  PREFETCH
@@ -181,11 +189,12 @@ async function prefetchAnggota() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  DASHBOARD — ringan, hanya getDashboardStats
+//  DASHBOARD
 // ════════════════════════════════════════════════════════════════════════
 async function loadDashboard() {
-  const ids = ["s-total","s-lunas","s-belum","s-nominal"];
-  ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = "…"; });
+  ["s-total","s-lunas","s-belum","s-nominal"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.textContent = "…";
+  });
   try {
     const periode = `${BULAN_INI} ${TAHUN_INI}`;
     const res     = await api({ action: "getDashboardStats", token: session?.token, periode });
@@ -207,10 +216,9 @@ async function loadDashboard() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  CARI ANGGOTA — halaman baru dengan filter
+//  CARI ANGGOTA
 // ════════════════════════════════════════════════════════════════════════
 function initCariPage(presetStatus) {
-  // set filter bulan/tahun ke bulan ini
   const selBulan = document.getElementById("cari-filter-bulan");
   const selTahun = document.getElementById("cari-filter-tahun");
   if (selBulan) selBulan.value = BULAN_INI;
@@ -225,10 +233,8 @@ function initCariPage(presetStatus) {
   if (presetStatus) {
     const selStatus = document.getElementById("cari-filter-status");
     if (selStatus) selStatus.value = presetStatus;
-    // langsung cari
     doCariFilter();
   } else {
-    // reset hasil
     document.getElementById("cari-results").innerHTML = "";
     const infoEl = document.getElementById("cari-info");
     if (infoEl) infoEl.style.display = "none";
@@ -266,9 +272,7 @@ async function doCariFilter() {
       infoEl.textContent = `${res.total} anggota ditemukan · Filter: ${filterLabel} · Periode: ${periode}`;
       infoEl.style.display = "block";
     }
-
-    if (btnExport) btnExport.disabled = cariData.length === 0 || filter !== "belum";
-
+    if (btnExport) btnExport.disabled = cariData.length === 0;
     renderCariResults();
   } catch(err) {
     if (resultsEl) resultsEl.innerHTML = `<div class="empty"><p>Gagal: ${err.message}</p></div>`;
@@ -284,68 +288,89 @@ function renderCariResults() {
   const pg = paginate(data, page);
   pgState.cari.page = pg.curPage;
   el.innerHTML = `<div class="card"><div class="card-body" style="padding:0 16px;">
-    ${pg.items.map(a => `
-      <div class="pel-item" onclick="openDetail('${esc(a.id_anggota)}','cari')">
-        <div class="avatar">${initials(a.nama)}</div>
-        <div class="pel-info">
-          <div class="pel-name">${escHtml(a.nama)}</div>
-          <div class="pel-sub">No ${escHtml(a.no_rumah)} · ${a.total_tunggakan > 0 ? `<span style="color:var(--c-red)">Tunggakan ${rp(a.total_tunggakan)}</span>` : `<span style="color:var(--c-green)">Lunas</span>`}</div>
-        </div>
-        ${a.total_tunggakan > 0
-          ? `<span class="badge badge-red">${a.bulan_tunggak_kas + a.bulan_tunggak_rmd} bln</span>`
-          : `<span class="badge badge-green">✓</span>`}
-      </div>
-    `).join("")}
+    ${pg.items.map(a => {
+      const totalBln = a.bulan_tunggak_kas + a.bulan_tunggak_rmd + a.bulan_tunggak_konsumsi + a.bulan_tunggak_dana_17n;
+      const iuranLabel = [
+        a.ikut_kas      ? "Kas"     : "",
+        a.ikut_rmd      ? "RMD"     : "",
+        a.ikut_konsumsi ? "Konsumsi": "",
+        a.ikut_dana_17n ? "17n"     : "",
+      ].filter(Boolean).join("+");
+      return `
+        <div class="pel-item" onclick="openDetail('${esc(a.id_anggota)}','cari')">
+          <div class="avatar">${initials(a.nama)}</div>
+          <div class="pel-info">
+            <div class="pel-name">${escHtml(a.nama)}</div>
+            <div class="pel-sub">No ${escHtml(a.no_rumah)} · ${iuranLabel} · ${
+              a.total_tunggakan > 0
+                ? `<span style="color:var(--c-red)">Tunggakan ${rp(a.total_tunggakan)}</span>`
+                : `<span style="color:var(--c-green)">Lunas</span>`
+            }</div>
+          </div>
+          ${a.total_tunggakan > 0
+            ? `<span class="badge badge-red">${totalBln} bln</span>`
+            : `<span class="badge badge-green">✓</span>`}
+        </div>`;
+    }).join("")}
     ${renderPagination("cari", pg.curPage, pg.totalPages, data.length, pg.start, pg.end)}
   </div></div>`;
 }
 
-// Export Excel dari halaman Cari — fetch getTunggakan per anggota belum bayar
 async function exportCariExcel() {
   if (!cariData.length) { showToast("Tidak ada data untuk diexport", "error"); return; }
   if (typeof XLSX === "undefined") { showToast("Library Excel belum dimuat", "error"); return; }
 
   const bulan   = document.getElementById("cari-filter-bulan")?.value || BULAN_INI;
   const tahun   = document.getElementById("cari-filter-tahun")?.value || TAHUN_INI;
+  const filter  = document.getElementById("cari-filter-status")?.value || "semua";
   const periode = `${bulan} ${tahun}`;
 
   const btn = document.getElementById("btn-export-cari");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Menyiapkan..."; }
 
   try {
-    const rows = [];
-    let no = 1;
+    const rows = []; let no = 1;
+
+    // Export rinci tunggakan jika data memang punya tunggakan.
     for (const a of cariData) {
-      if (a.total_tunggakan <= 0) continue;
+      if ((a.total_tunggakan || 0) <= 0) continue;
       try {
         const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: a.id_anggota });
         if (res.status === "ok" && res.data) {
-          for (const t of (res.data.kas || [])) {
-            rows.push({ "No": no++, "Nama": a.nama, "No Rumah": a.no_rumah,
-              "Jenis": "Kas", "Bulan Tunggakan": `${t.bulan} ${t.tahun}`, "Nominal": t.nominal, "Status": "Belum Bayar" });
-          }
-          for (const t of (res.data.rmd || [])) {
-            rows.push({ "No": no++, "Nama": a.nama, "No Rumah": a.no_rumah,
-              "Jenis": "RMD", "Bulan Tunggakan": `${t.bulan} ${t.tahun}`, "Nominal": t.nominal, "Status": "Belum Bayar" });
-          }
+          const d = res.data;
+          for (const t of (d.kas      || [])) rows.push(makeExportRow(no++, a, "Kas",              t));
+          for (const t of (d.rmd      || [])) rows.push(makeExportRow(no++, a, "Piranti RMD",      t));
+          for (const t of (d.konsumsi || [])) rows.push(makeExportRow(no++, a, "Konsumsi",         t));
+          for (const t of (d.dana_17n || [])) rows.push(makeExportRow(no++, a, "Dana 17n",         t));
         }
       } catch(e) { console.error("Gagal fetch tunggakan", a.nama, e); }
     }
-    if (!rows.length) { showToast("Tidak ada tunggakan ditemukan", "error"); return; }
-    const grandTotal = rows.reduce((s, r) => s + Number(r["Nominal"] || 0), 0);
-    rows.push({ "No": "", "Nama": "", "No Rumah": "", "Jenis": "", "Bulan Tunggakan": "TOTAL", "Nominal": grandTotal, "Status": "" });
 
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch:5 },{ wch:25 },{ wch:10 },{ wch:8 },{ wch:20 },{ wch:14 },{ wch:14 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Tunggakan Belum Bayar");
-    XLSX.writeFile(wb, `Tunggakan_Belum_Bayar_${safeFileName(periode)}.xlsx`);
+    if (rows.length) {
+      const grand = rows.reduce((s, r) => s + Number(r["Nominal"] || 0), 0);
+      rows.push({ "No":"","Nama":"","No Rumah":"","Jenis":"","Bulan Tunggakan":"TOTAL","Nominal":grand,"Status":"" });
+      exportToXlsx(rows, `Tunggakan_${safeFileName(filter)}_${safeFileName(periode)}.xlsx`, "Tunggakan");
+      showToast("File Excel berhasil dibuat", "success");
+      return;
+    }
+
+    // Jika hasil pencarian tidak punya tunggakan, tetap export data yang tampil.
+    const summaryRows = cariData.map((a, idx) => ({
+      "No": idx + 1,
+      "Nama": a.nama || "",
+      "No Rumah": a.no_rumah || "-",
+      "Status Warga": statusWargaLabel(a),
+      "Status Bayar": (a.total_tunggakan || 0) > 0 ? "Belum Bayar" : "Lunas",
+      "Kas Tunggak (Bln)": a.bulan_tunggak_kas || 0,
+      "RMD Tunggak (Bln)": a.bulan_tunggak_rmd || 0,
+      "Konsumsi Tunggak (Bln)": a.bulan_tunggak_konsumsi || 0,
+      "Dana 17n Tunggak (Bln)": a.bulan_tunggak_dana_17n || 0,
+      "Total Tunggakan": a.total_tunggakan || 0,
+    }));
+    exportToXlsx(summaryRows, `Hasil_Cari_${safeFileName(filter)}_${safeFileName(periode)}.xlsx`, "Hasil Cari");
     showToast("File Excel berhasil dibuat", "success");
-  } catch(e) {
-    showToast("Gagal export: " + e.message, "error");
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = "⬇️ Export Excel"; }
-  }
+  } catch(e) { showToast("Gagal export: " + e.message, "error"); }
+  finally { if (btn) { btn.disabled = cariData.length === 0; btn.textContent = "⬇️ Export Excel"; } }
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -366,35 +391,42 @@ async function openDetail(id, from = "cari") {
     const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: id });
     if (res.status !== "ok" || !res.data) { detailEl.innerHTML = `<div class="empty">Gagal memuat</div>`; return; }
     const d = res.data;
-    const kasList = d.kas || [], rmdList = d.rmd || [];
-    const totalTunggakan = (d.total_kas || 0) + (d.total_rmd || 0);
+    const totalTunggakan = d.grand_total || 0;
+
     let html = `
-      <div class="info-row"><span class="lbl">Anggota</span><span class="val">${escHtml(anggota.nama)} (${rp(d.iuran_kas + (d.ikut_rmd ? d.iuran_rmd : 0))}/bln)</span></div>
+      <div class="info-row"><span class="lbl">Anggota</span><span class="val">${escHtml(anggota.nama)}</span></div>
       <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono">${escHtml(anggota.no_rumah)}</span></div>
-      <div class="divider"></div>
-      <div class="tunggakan-container">`;
-    if (kasList.length > 0) {
-      html += `<div class="section-label">💰 Kas (${rp(d.iuran_kas)}/bulan)</div>`;
-      html += kasList.map(t => `<div class="tunggakan-item">📅 ${escHtml(t.bulan)} ${escHtml(String(t.tahun))} — ${rp(t.nominal)} ❌</div>`).join("");
-    } else { html += `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`; }
-    html += `</div><div class="tunggakan-container">`;
-    if (rmdList.length > 0) {
-      html += `<div class="section-label">🏦 RMD (${rp(d.iuran_rmd)}/bulan)</div>`;
-      html += rmdList.map(t => `<div class="tunggakan-item">📅 ${escHtml(t.bulan)} ${escHtml(String(t.tahun))} — ${rp(t.nominal)} ❌</div>`).join("");
-    } else { html += `<div class="empty small">✅ Tidak ada tunggakan RMD</div>`; }
-    html += `</div>
+      <div class="info-row"><span class="lbl">Iuran/Bulan</span><span class="val">${rp(anggota.iuran_per_bulan)}</span></div>
+      <div class="divider"></div>`;
+
+    html += renderTunggakanBlock("💰 Kas",             d.kas,      d.iuran_kas,      d.ikut_kas);
+    html += renderTunggakanBlock("🏦 Piranti RMD",     d.rmd,      d.iuran_rmd,      d.ikut_rmd);
+    html += renderTunggakanBlock("🍽️ Konsumsi",        d.konsumsi, d.iuran_konsumsi, d.ikut_konsumsi);
+    html += renderTunggakanBlock("🎉 Dana 17n",         d.dana_17n, d.iuran_dana_17n, d.ikut_dana_17n);
+
+    html += `
       <div class="total-box">
         <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total">${rp(totalTunggakan)}</span></div>
       </div>
       <button class="btn btn-green" style="margin-top:12px;" onclick="openBayarDariDetail('${esc(anggota.id_anggota)}')">💰 Bayar Sekarang</button>`;
+
     detailEl.innerHTML = html;
   } catch(e) { detailEl.innerHTML = `<div class="empty">Error: ${e.message}</div>`; }
 }
 
-async function openBayarDariDetail(id) {
-  goPage("bayar");
-  await pilihAnggotaBayar(id);
+function renderTunggakanBlock(label, list, nominal, ikut) {
+  if (!ikut) return "";
+  let html = `<div class="tunggakan-container">`;
+  if (!list || list.length === 0) {
+    html += `<div class="empty small">✅ Tidak ada tunggakan ${label.replace(/^[^\s]+\s/,"")}</div>`;
+  } else {
+    html += `<div class="section-label">${label} (${rp(nominal)}/bulan)</div>`;
+    html += list.map(t => `<div class="tunggakan-item">📅 ${escHtml(t.bulan)} ${escHtml(String(t.tahun))} — ${rp(t.nominal)} ❌</div>`).join("");
+  }
+  return html + `</div>`;
 }
+
+async function openBayarDariDetail(id) { goPage("bayar"); await pilihAnggotaBayar(id); }
 
 // ════════════════════════════════════════════════════════════════════════
 //  FORM BAYAR
@@ -404,20 +436,24 @@ let bayarAnggota = null, bayarSearchTimer;
 function resetBayarForm() {
   bayarAnggota = null; currentTunggakan = null;
   pgState.bayar.data = []; pgState.bayar.page = 1;
-  const ids = { "bayar-search": "val", "bayar-search-results": "html", "bayar-nama": "dash",
-                "bayar-norumah": "dash", "tunggakan-kas": "html", "tunggakan-rmd": "html",
-                "bayar-total": "rp0", "bayar-grand": "rp0" };
-  Object.entries(ids).forEach(([id, type]) => {
+
+  const fields = ["bayar-search","bayar-nama","bayar-norumah",
+                  "tunggakan-kas","tunggakan-rmd","tunggakan-konsumsi","tunggakan-dana17n",
+                  "bayar-total","bayar-grand","bayar-jml-kas","bayar-jml-rmd",
+                  "bayar-jml-konsumsi","bayar-jml-dana17n","bayar-search-results"];
+  fields.forEach(id => {
     const el = document.getElementById(id); if (!el) return;
-    if (type === "val") el.value = "";
-    else if (type === "html") el.innerHTML = "";
-    else if (type === "dash") el.textContent = "—";
-    else if (type === "rp0") el.textContent = "Rp 0";
+    if (el.tagName === "INPUT") el.value = "";
+    else el.innerHTML = "";
+    if (["bayar-nama","bayar-norumah"].includes(id)) el.textContent = "—";
+    if (["bayar-total","bayar-grand"].includes(id))  el.textContent = "Rp 0";
   });
-  const jmlKas = document.getElementById("bayar-jml-kas"); if (jmlKas) jmlKas.value = "";
-  const jmlRmd = document.getElementById("bayar-jml-rmd"); if (jmlRmd) jmlRmd.value = "";
+
   document.getElementById("bayar-form-card")?.style && (document.getElementById("bayar-form-card").style.display = "none");
-  document.getElementById("bayar-rmd-group")?.style  && (document.getElementById("bayar-rmd-group").style.display  = "none");
+  // Sembunyikan semua grup iuran opsional
+  ["bayar-kas-group","bayar-rmd-group","bayar-konsumsi-group","bayar-dana17n-group"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = "none";
+  });
 }
 
 function doBayarSearch(val) {
@@ -430,7 +466,7 @@ function doBayarSearch(val) {
       let results;
       if (allAnggota.length) {
         const kw = val.toLowerCase();
-        results = allAnggota.filter(p => String(p.no_rumah).toLowerCase().includes(kw) || p.nama.toLowerCase().includes(kw));
+        results = allAnggota.filter(p => hasIuranWajib(p) && matchAnggotaKeyword(p, kw));
       } else {
         const res = await api({ action: "searchAnggota", token: session?.token, keyword: val });
         results = res.status === "ok" ? res.data : [];
@@ -449,7 +485,7 @@ function renderBayarSearchResults(list) {
     <div class="pel-item" onclick="pilihAnggotaBayar('${esc(p.id_anggota)}')">
       <div class="avatar">${initials(p.nama)}</div>
       <div class="pel-info"><div class="pel-name">${escHtml(p.nama)}</div>
-        <div class="pel-sub">No ${escHtml(p.no_rumah)} · ${rp(totalIuranBulanan(p))}/bln</div></div>
+        <div class="pel-sub">No ${escHtml(p.no_rumah || "-")} · ${rp(p.iuran_per_bulan || 0)}/bln · ${statusWargaLabel(p)}</div></div>
       <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2"/></svg>
     </div>
   `).join("") + renderPagination("bayar", pg.curPage, pg.totalPages, list.length, pg.start, pg.end);
@@ -460,9 +496,9 @@ async function pilihAnggotaBayar(id) {
   if (!allAnggota.length) await prefetchAnggota();
   bayarAnggota = allAnggota.find(a => String(a.id_anggota) == String(id));
   if (!bayarAnggota) { showToast("Anggota tidak ditemukan", "error"); return; }
-  document.getElementById("bayar-nama").textContent     = `${bayarAnggota.nama} (${rp(totalIuranBulanan(bayarAnggota))}/bln)`;
-  document.getElementById("bayar-norumah").textContent  = bayarAnggota.no_rumah;
-  document.getElementById("bayar-search").value         = bayarAnggota.nama;
+  document.getElementById("bayar-nama").textContent    = `${bayarAnggota.nama} (${rp(bayarAnggota.iuran_per_bulan || 0)}/bln)`;
+  document.getElementById("bayar-norumah").textContent = bayarAnggota.no_rumah;
+  document.getElementById("bayar-search").value        = bayarAnggota.nama;
   document.getElementById("bayar-search-results").innerHTML = "";
   document.getElementById("bayar-form-card").style.display  = "block";
   await loadTunggakan(bayarAnggota.id_anggota);
@@ -471,38 +507,70 @@ async function pilihAnggotaBayar(id) {
 async function loadTunggakan(id) {
   const kasEl   = document.getElementById("tunggakan-kas");
   const rmdEl   = document.getElementById("tunggakan-rmd");
+  const konEl   = document.getElementById("tunggakan-konsumsi");
+  const d17El   = document.getElementById("tunggakan-dana17n");
   const totalEl = document.getElementById("bayar-total");
   if (kasEl) kasEl.innerHTML = "<div class='loading'>⏳ Memuat tunggakan...</div>";
-  if (rmdEl) rmdEl.innerHTML = "";
+  [rmdEl, konEl, d17El].forEach(el => { if (el) el.innerHTML = ""; });
+
   try {
     const res = await api({ action: "getTunggakan", token: session?.token, id_anggota: id });
     if (res.status === "ok" && res.data) {
       currentTunggakan = res.data;
-      const kasList = res.data.kas || [], rmdList = res.data.rmd || [];
-      const iuranKas = Number(res.data.iuran_kas || 0), iuranRmd = Number(res.data.iuran_rmd || 0);
-      document.getElementById("bayar-nama").textContent = `${bayarAnggota.nama} (${rp(iuranKas + iuranRmd)}/bln)`;
-      if (kasEl) {
-        kasEl.innerHTML = kasList.length === 0
-          ? `<div class="empty small">✅ Tidak ada tunggakan Kas</div>`
-          : `<div class="section-label">💰 Kas (${rp(iuranKas)}/bulan)</div>` +
-            kasList.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
+      const d = res.data;
+
+      // Kas
+      const kasGroup = document.getElementById("bayar-kas-group");
+      if (d.ikut_kas && d.kas.length > 0) {
+        if (kasGroup) kasGroup.style.display = "block";
+        if (kasEl) kasEl.innerHTML = `<div class="section-label">💰 Kas (${rp(d.iuran_kas)}/bulan)</div>` +
+          d.kas.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
+      } else {
+        if (kasGroup) kasGroup.style.display = "none";
+        if (kasEl) kasEl.innerHTML = d.ikut_kas ? `<div class="empty small">✅ Tidak ada tunggakan Kas</div>` : "";
       }
+
+      // RMD
       const rmdGroup = document.getElementById("bayar-rmd-group");
-      if (bayarAnggota.ikut_rmd && rmdList.length > 0) {
+      if (d.ikut_rmd && d.rmd.length > 0) {
         if (rmdGroup) rmdGroup.style.display = "block";
-        if (rmdEl) rmdEl.innerHTML = `<div class="section-label">🏦 RMD (${rp(iuranRmd)}/bulan)</div>` +
-          rmdList.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
+        if (rmdEl) rmdEl.innerHTML = `<div class="section-label">🏦 Piranti RMD (${rp(d.iuran_rmd)}/bulan)</div>` +
+          d.rmd.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
       } else {
         if (rmdGroup) rmdGroup.style.display = "none";
-        if (rmdEl) rmdEl.innerHTML = "";
       }
-      if (totalEl) totalEl.textContent = rp((res.data.total_kas || 0) + (res.data.total_rmd || 0));
-      const jmlKas = document.getElementById("bayar-jml-kas");
-      const jmlRmd = document.getElementById("bayar-jml-rmd");
-      if (jmlKas) { jmlKas.max = kasList.length; jmlKas.value = ""; }
-      if (jmlRmd) { jmlRmd.max = rmdList.length; jmlRmd.value = ""; }
+
+      // Konsumsi
+      const konGroup = document.getElementById("bayar-konsumsi-group");
+      if (d.ikut_konsumsi && d.konsumsi.length > 0) {
+        if (konGroup) konGroup.style.display = "block";
+        if (konEl) konEl.innerHTML = `<div class="section-label">🍽️ Konsumsi (${rp(d.iuran_konsumsi)}/bulan)</div>` +
+          d.konsumsi.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
+      } else {
+        if (konGroup) konGroup.style.display = "none";
+      }
+
+      // Dana 17n
+      const d17Group = document.getElementById("bayar-dana17n-group");
+      if (d.ikut_dana_17n && d.dana_17n.length > 0) {
+        if (d17Group) d17Group.style.display = "block";
+        if (d17El) d17El.innerHTML = `<div class="section-label">🎉 Dana 17n (${rp(d.iuran_dana_17n)}/bulan)</div>` +
+          d.dana_17n.map(t => `<div class="tunggakan-item">📅 ${t.bulan} ${t.tahun} — ${rp(t.nominal)} ❌</div>`).join("");
+      } else {
+        if (d17Group) d17Group.style.display = "none";
+      }
+
+      if (totalEl) totalEl.textContent = rp(d.grand_total || 0);
+
+      // Set max & reset input
+      setInputMax("bayar-jml-kas",     d.kas?.length      || 0);
+      setInputMax("bayar-jml-rmd",     d.rmd?.length      || 0);
+      setInputMax("bayar-jml-konsumsi",d.konsumsi?.length || 0);
+      setInputMax("bayar-jml-dana17n", d.dana_17n?.length || 0);
+
       updateTotalBayar();
-      showToast(`Tunggakan: ${kasList.length} bln Kas${rmdList.length > 0 ? `, ${rmdList.length} bln RMD` : ""}`, "success");
+      const totalBln = (d.kas?.length||0) + (d.rmd?.length||0) + (d.konsumsi?.length||0) + (d.dana_17n?.length||0);
+      showToast(`Tunggakan: ${totalBln} bulan`, "success");
     } else {
       if (kasEl) kasEl.innerHTML = `<div class="empty">Gagal: ${res.message || "Unknown"}</div>`;
       showToast(res.message || "Gagal memuat tunggakan", "error");
@@ -514,26 +582,43 @@ async function loadTunggakan(id) {
   }
 }
 
+function setInputMax(id, max) {
+  const el = document.getElementById(id); if (el) { el.max = max; el.value = ""; }
+}
+
 function updateTotalBayar() {
-  const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
-  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
-  const total  = (jmlKas * (currentTunggakan?.iuran_kas || 0)) + (jmlRmd * (currentTunggakan?.iuran_rmd || 0));
+  if (!currentTunggakan) return;
+  const d   = currentTunggakan;
+  const kas = parseInt(document.getElementById("bayar-jml-kas")?.value      || 0);
+  const rmd = parseInt(document.getElementById("bayar-jml-rmd")?.value      || 0);
+  const kon = parseInt(document.getElementById("bayar-jml-konsumsi")?.value || 0);
+  const d17 = parseInt(document.getElementById("bayar-jml-dana17n")?.value  || 0);
+  const total = (kas * (d.iuran_kas||0)) + (rmd * (d.iuran_rmd||0)) +
+                (kon * (d.iuran_konsumsi||0)) + (d17 * (d.iuran_dana_17n||0));
   const grandEl = document.getElementById("bayar-grand");
   if (grandEl) grandEl.textContent = rp(total);
 }
 
 async function simpanPembayaran() {
   if (!bayarAnggota) { showToast("Pilih anggota terlebih dahulu", "error"); return; }
-  const jmlKas = parseInt(document.getElementById("bayar-jml-kas")?.value || 0);
-  const jmlRmd = parseInt(document.getElementById("bayar-jml-rmd")?.value || 0);
-  if (jmlKas === 0 && jmlRmd === 0) { showToast("Pilih minimal 1 bulan untuk dibayar", "error"); return; }
+  const jml_kas      = parseInt(document.getElementById("bayar-jml-kas")?.value      || 0);
+  const jml_rmd      = parseInt(document.getElementById("bayar-jml-rmd")?.value      || 0);
+  const jml_konsumsi = parseInt(document.getElementById("bayar-jml-konsumsi")?.value || 0);
+  const jml_dana_17n = parseInt(document.getElementById("bayar-jml-dana17n")?.value  || 0);
+  if (jml_kas + jml_rmd + jml_konsumsi + jml_dana_17n === 0) {
+    showToast("Pilih minimal 1 bulan untuk dibayar", "error"); return;
+  }
   const btn = document.getElementById("btn-simpan-bayar");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Menyimpan..."; }
   try {
     const res = await api({
       action: "simpanPembayaran", token: session?.token,
-      data: { id_anggota: bayarAnggota.id_anggota, periode_tagihan: `${BULAN_INI} ${TAHUN_INI}`,
-              jml_bulan_kas: jmlKas, jml_bulan_rmd: jmlRmd, petugas: session?.nama || session?.username }
+      data: {
+        id_anggota:      bayarAnggota.id_anggota,
+        periode_tagihan: `${BULAN_INI} ${TAHUN_INI}`,
+        jml_bulan: { kas: jml_kas, rmd: jml_rmd, konsumsi: jml_konsumsi, dana_17n: jml_dana_17n },
+        petugas: session?.nama || session?.username,
+      }
     });
     if (res.status === "ok") {
       showToast(res.message, "success");
@@ -547,7 +632,7 @@ async function simpanPembayaran() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-//  LAPORAN — ringan, tanpa getTunggakan
+//  LAPORAN
 // ════════════════════════════════════════════════════════════════════════
 function initFilterLaporan() {
   const selBulan = document.getElementById("lap-filter-bulan");
@@ -567,95 +652,26 @@ async function loadLaporan() {
   const tahun   = document.getElementById("lap-filter-tahun")?.value || TAHUN_INI;
   const periode = `${bulan} ${tahun}`;
   document.getElementById("lap-periode").textContent = periode;
-  ["lap-total","lap-lunas","lap-belum","lap-total-kas","lap-total-rmd","lap-grand-total"].forEach(id => {
+  ["lap-total","lap-lunas","lap-belum","lap-total-kas","lap-total-rmd",
+   "lap-total-konsumsi","lap-total-dana17n","lap-grand-total"].forEach(id => {
     const el = document.getElementById(id); if (el) el.textContent = "…";
   });
-  const lapList = document.getElementById("lap-list");
-  if (lapList) lapList.innerHTML = `<div class="loading">⏳ Memuat…</div>`;
-  const btnExport = document.getElementById("btn-export-belum");
-  if (btnExport) btnExport.disabled = true;
-
   try {
     const res = await api({ action: "getLaporanPeriode", token: session?.token, periode });
     if (res.status !== "ok") throw new Error(res.message);
-    const { laporan, detail } = res;
-    document.getElementById("lap-total").textContent      = laporan.total_anggota;
-    document.getElementById("lap-lunas").textContent      = laporan.sudah_bayar;
-    document.getElementById("lap-belum").textContent      = laporan.belum_bayar;
-    document.getElementById("lap-total-kas").textContent  = rp(laporan.total_kas   || 0);
-    document.getElementById("lap-total-rmd").textContent  = rp(laporan.total_rmd   || 0);
-    document.getElementById("lap-grand-total").textContent = rp(laporan.grand_total || laporan.total_kas + laporan.total_rmd || 0);
-
-    const lunas = (detail || []).filter(t => t.status === "Lunas");
-    pgState.laporan.data = lunas;
-    pgState.laporan.page = 1;
-    laporanPeriodeAktif  = periode;
-    laporanBelumBayarData = []; // reset, akan di-fetch saat export
-
-    if (btnExport) btnExport.disabled = laporan.belum_bayar === 0;
-    renderLaporanList();
+    const { laporan } = res;
+    document.getElementById("lap-total").textContent         = laporan.total_anggota;
+    document.getElementById("lap-lunas").textContent         = laporan.sudah_bayar;
+    document.getElementById("lap-belum").textContent         = laporan.belum_bayar;
+    document.getElementById("lap-total-kas").textContent     = rp(laporan.total_kas       || 0);
+    document.getElementById("lap-total-rmd").textContent     = rp(laporan.total_rmd       || 0);
+    document.getElementById("lap-total-konsumsi").textContent= rp(laporan.total_konsumsi  || 0);
+    document.getElementById("lap-total-dana17n").textContent = rp(laporan.total_dana_17n  || 0);
+    document.getElementById("lap-grand-total").textContent   = rp(laporan.grand_total     || 0);
+    laporanPeriodeAktif = periode;
   } catch(err) {
-    if (lapList) lapList.innerHTML = `<div class="empty"><p>Gagal memuat data</p></div>`;
     showToast("Gagal memuat laporan", "error");
   }
-}
-
-function renderLaporanList() {
-  const { data, page } = pgState.laporan;
-  const el = document.getElementById("lap-list"); if (!el) return;
-  if (!data.length) { el.innerHTML = `<div class="empty"><p>Tidak ada transaksi pada periode ini</p></div>`; return; }
-  const pg = paginate(data, page); pgState.laporan.page = pg.curPage;
-  el.innerHTML = pg.items.map(t => `
-    <div class="info-row">
-      <div class="pel-info" style="flex:1">
-        <div class="pel-name">${escHtml(t.nama)}</div>
-        <div class="pel-sub">No ${escHtml(t.no_rumah)} · ${escHtml(t.jenis_iuran)} · ${escHtml(t.bulan_dibayar || "")} ${escHtml(String(t.tahun || ""))}</div>
-      </div>
-      <span class="badge badge-green">${rp(t.nominal)}</span>
-    </div>
-  `).join("") + renderPagination("laporan", pg.curPage, pg.totalPages, data.length, pg.start, pg.end);
-}
-
-// Export dari Laporan — fetch cariAnggotaFilter dengan filter belum dulu, lalu getTunggakan per orang
-async function exportBelumBayarExcel() {
-  if (typeof XLSX === "undefined") { showToast("Library Excel belum dimuat", "error"); return; }
-  const btn = document.getElementById("btn-export-belum");
-  if (btn) { btn.disabled = true; btn.textContent = "⏳ Menyiapkan..."; }
-  try {
-    // Ambil daftar anggota belum bayar untuk periode ini
-    const res = await api({ action: "cariAnggotaFilter", token: session?.token,
-                            keyword: "", filter: "belum", periode: laporanPeriodeAktif });
-    if (res.status !== "ok") throw new Error(res.message);
-    const belumList = res.data || [];
-    if (!belumList.length) { showToast("Tidak ada yang belum bayar", "error"); return; }
-
-    const rows = []; let no = 1;
-    for (const a of belumList) {
-      if (a.total_tunggakan <= 0) continue;
-      try {
-        const tres = await api({ action: "getTunggakan", token: session?.token, id_anggota: a.id_anggota });
-        if (tres.status === "ok" && tres.data) {
-          for (const t of (tres.data.kas || []))
-            rows.push({ "No": no++, "Nama": a.nama, "No Rumah": a.no_rumah,
-              "Jenis": "Kas", "Bulan Tunggakan": `${t.bulan} ${t.tahun}`, "Nominal": t.nominal, "Status": "Belum Bayar" });
-          for (const t of (tres.data.rmd || []))
-            rows.push({ "No": no++, "Nama": a.nama, "No Rumah": a.no_rumah,
-              "Jenis": "RMD", "Bulan Tunggakan": `${t.bulan} ${t.tahun}`, "Nominal": t.nominal, "Status": "Belum Bayar" });
-        }
-      } catch(e) { console.error(e); }
-    }
-    if (!rows.length) { showToast("Tidak ada detail tunggakan", "error"); return; }
-    const grand = rows.reduce((s, r) => s + Number(r["Nominal"] || 0), 0);
-    rows.push({ "No":"","Nama":"","No Rumah":"","Jenis":"","Bulan Tunggakan":"TOTAL","Nominal":grand,"Status":"" });
-
-    const ws = XLSX.utils.json_to_sheet(rows);
-    ws["!cols"] = [{ wch:5 },{ wch:25 },{ wch:10 },{ wch:8 },{ wch:20 },{ wch:14 },{ wch:14 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Belum Bayar");
-    XLSX.writeFile(wb, `Tunggakan_${safeFileName(laporanPeriodeAktif)}.xlsx`);
-    showToast("File Excel berhasil dibuat", "success");
-  } catch(e) { showToast("Gagal export: " + e.message, "error"); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = "⬇️ Export Belum Bayar"; } }
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -679,9 +695,8 @@ function renderPagination(section, page, totalPages, total, start, end) {
 }
 function changePage(section, dir) {
   pgState[section].page += dir;
-  if (section === "cari")    renderCariResults();
-  if (section === "bayar")   renderBayarSearchResults(pgState.bayar.data);
-  if (section === "laporan") renderLaporanList();
+  if (section === "cari")  renderCariResults();
+  if (section === "bayar") renderBayarSearchResults(pgState.bayar.data);
 }
 
 // ════════════════════════════════════════════════════════════════════════
@@ -692,10 +707,18 @@ function initials(nama) { return (nama || "").split(" ").slice(0,2).map(w => w[0
 function esc(str)       { return String(str || "").replace(/'/g, "\\'"); }
 function escHtml(str)   { return String(str || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function safeFileName(s){ return String(s||"laporan").replace(/\s+/g,"_").replace(/[^\w\-]/g,""); }
-function totalIuranBulanan(p) {
-  const kas = Number(p?.iuran_kas || 0);
-  const ikut = p?.ikut_rmd === true || ["true","ya","y"].includes(String(p?.ikut_rmd||"").toLowerCase());
-  return kas + (ikut ? Number(p?.iuran_rmd || 0) : 0);
+
+function makeExportRow(no, a, jenis, t) {
+  return { "No": no, "Nama": a.nama, "No Rumah": a.no_rumah,
+           "Jenis": jenis, "Bulan Tunggakan": `${t.bulan} ${t.tahun}`,
+           "Nominal": t.nominal, "Status": "Belum Bayar" };
+}
+function exportToXlsx(rows, filename, sheetName) {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [{ wch:5 },{ wch:28 },{ wch:10 },{ wch:20 },{ wch:20 },{ wch:14 },{ wch:14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+  XLSX.writeFile(wb, filename);
 }
 
 let toastTimer;

@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="mobile-web-app-capable" content="yes"/>
-<title>SiKAS — Iuran Kas & RMD</title>
+<title>SiKAS — Iuran RT</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="style.css"/>
@@ -17,7 +17,7 @@
   <div class="login-logo">
     <div class="drop">💰</div>
     <h1>SiKAS</h1>
-    <p>Sistem Iuran Kas &amp; RMD</p>
+    <p>Sistem Iuran Kas RT</p>
   </div>
   <div class="login-card">
     <h2>Masuk ke sistem</h2>
@@ -43,14 +43,12 @@
     </div>
   </div>
   <div class="page-body">
-    <!-- Statistik ringkas -->
     <div class="stat-grid">
-      <div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="s-total">—</div></div>
+      <div class="stat-box"><div class="stat-label">Total Warga</div><div class="stat-val blue" id="s-total">—</div></div>
       <div class="stat-box"><div class="stat-label">Sudah Bayar</div><div class="stat-val green" id="s-lunas">—</div></div>
       <div class="stat-box"><div class="stat-label">Belum Bayar</div><div class="stat-val red" id="s-belum">—</div></div>
       <div class="stat-box"><div class="stat-label">Terkumpul</div><div class="stat-val sm blue" id="s-nominal">—</div></div>
     </div>
-    <!-- Progress -->
     <div class="card">
       <div class="card-body">
         <div class="stat-label">Progress bulan ini</div>
@@ -58,11 +56,10 @@
         <div style="text-align:right;font-size:11px;margin-top:4px;" id="s-pct">0%</div>
       </div>
     </div>
-    <!-- Shortcut ke Cari -->
     <div class="card">
       <div class="card-body" style="display:flex;gap:12px;">
-        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('belum')">📋 Lihat Belum Bayar</button>
-        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('lunas')">✅ Lihat Sudah Bayar</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('belum')">📋 Belum Bayar</button>
+        <button class="btn btn-outline" style="flex:1;" onclick="goPageCari('lunas')">✅ Sudah Bayar</button>
       </div>
     </div>
   </div>
@@ -74,24 +71,20 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════ CARI ANGGOTA (baru) ════════════ -->
+<!-- ══════════════════════════ CARI WARGA ════════════ -->
 <div class="page" id="pg-cari">
   <div class="topbar">
     <div class="topbar-row">
-      <div><h1>Cari Anggota</h1><div class="sub">Filter nama, no. rumah & status</div></div>
+      <div><h1>Cari Warga</h1><div class="sub">Filter nama, no. rumah &amp; status</div></div>
     </div>
   </div>
   <div class="page-body">
-
-    <!-- Panel Filter -->
     <div class="card" style="margin-bottom:12px;">
       <div class="card-body">
-        <!-- Keyword -->
         <div class="search-wrap" style="margin-bottom:12px;">
           <span>🔍</span>
           <input class="search-input" id="cari-keyword" type="search" placeholder="Nama / no. rumah (kosongkan = semua)"/>
         </div>
-        <!-- Filter baris -->
         <div class="form-row" style="margin-bottom:12px;">
           <div class="form-group" style="margin-bottom:0;">
             <label class="form-label">Status</label>
@@ -115,20 +108,14 @@
             <select class="form-input" id="cari-filter-tahun"></select>
           </div>
         </div>
-        <!-- Tombol aksi -->
         <div style="display:flex;gap:10px;">
           <button class="btn btn-primary" style="flex:1;" onclick="doCariFilter()">🔍 Cari</button>
           <button class="btn btn-outline btn-small" id="btn-export-cari" onclick="exportCariExcel()" disabled>⬇️ Export Excel</button>
         </div>
       </div>
     </div>
-
-    <!-- Info hasil -->
     <div id="cari-info" style="font-size:12px;color:var(--c-text2);margin-bottom:8px;display:none;"></div>
-
-    <!-- Hasil -->
     <div id="cari-results"></div>
-
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -142,43 +129,69 @@
 <div class="page" id="pg-bayar">
   <div class="topbar">
     <div class="topbar-row">
-      <div><h1>Form Pembayaran</h1><div class="sub">Input iuran kas &amp; RMD</div></div>
+      <div><h1>Form Pembayaran</h1><div class="sub">Input iuran warga</div></div>
     </div>
   </div>
   <div class="page-body">
     <div class="card">
-      <div class="card-header"><span class="card-title">Cari Anggota</span></div>
+      <div class="card-header"><span class="card-title">Cari Warga</span></div>
       <div class="card-body">
         <div class="search-wrap">
           <span>🔍</span>
-          <input class="search-input" id="bayar-search" type="search" placeholder="Ketik nama / no. rumah…" oninput="doBayarSearch(this.value)" autocomplete="off"/>
+          <input class="search-input" id="bayar-search" type="search" placeholder="Ketik nama / no. rumah…"
+                 oninput="doBayarSearch(this.value)" autocomplete="off"/>
         </div>
         <div id="bayar-search-results"></div>
       </div>
     </div>
+
     <div class="card" id="bayar-form-card" style="display:none;">
       <div class="card-header"><span class="card-title">Detail Tunggakan</span></div>
       <div class="card-body">
-        <div class="info-row"><span class="lbl">Anggota</span><span class="val" id="bayar-nama">—</span></div>
+        <div class="info-row"><span class="lbl">Warga</span><span class="val" id="bayar-nama">—</span></div>
         <div class="info-row"><span class="lbl">No Rumah</span><span class="val mono" id="bayar-norumah">—</span></div>
         <div class="divider"></div>
-        <div id="tunggakan-kas" class="tunggakan-container"></div>
-        <div id="tunggakan-rmd" class="tunggakan-container"></div>
+
+        <!-- Tunggakan per jenis -->
+        <div id="tunggakan-kas"      class="tunggakan-container"></div>
+        <div id="tunggakan-rmd"      class="tunggakan-container"></div>
+        <div id="tunggakan-konsumsi" class="tunggakan-container"></div>
+        <div id="tunggakan-dana17n"  class="tunggakan-container"></div>
+
         <div class="total-box">
-          <div class="info-row"><span class="lbl" style="font-weight:700;">Total Tunggakan</span><span class="val total" id="bayar-total">Rp 0</span></div>
+          <div class="info-row">
+            <span class="lbl" style="font-weight:700;">Total Tunggakan</span>
+            <span class="val total" id="bayar-total">Rp 0</span>
+          </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Jumlah Bulan Kas yang Dibayar</label>
+
+        <!-- Input jumlah bulan per jenis — hanya tampil jika warga ikut iuran tersebut -->
+        <div class="form-row" style="flex-wrap:wrap;">
+          <div class="form-group" id="bayar-kas-group" style="flex:1;min-width:140px;display:none;">
+            <label class="form-label">💰 Bulan Kas dibayar</label>
             <input class="form-input" id="bayar-jml-kas" type="number" min="0" placeholder="0" oninput="updateTotalBayar()">
           </div>
-          <div class="form-group" id="bayar-rmd-group" style="display:none;">
-            <label class="form-label">Jumlah Bulan RMD yang Dibayar</label>
+          <div class="form-group" id="bayar-rmd-group" style="flex:1;min-width:140px;display:none;">
+            <label class="form-label">🏦 Bulan RMD dibayar</label>
             <input class="form-input" id="bayar-jml-rmd" type="number" min="0" placeholder="0" oninput="updateTotalBayar()">
           </div>
+          <div class="form-group" id="bayar-konsumsi-group" style="flex:1;min-width:140px;display:none;">
+            <label class="form-label">🍽️ Bulan Konsumsi dibayar</label>
+            <input class="form-input" id="bayar-jml-konsumsi" type="number" min="0" placeholder="0" oninput="updateTotalBayar()">
+          </div>
+          <div class="form-group" id="bayar-dana17n-group" style="flex:1;min-width:140px;display:none;">
+            <label class="form-label">🎉 Bulan Dana 17n dibayar</label>
+            <input class="form-input" id="bayar-jml-dana17n" type="number" min="0" placeholder="0" oninput="updateTotalBayar()">
+          </div>
         </div>
-        <div class="info-row" style="margin-top:12px;"><span class="lbl">Total Dibayar</span><span class="val total" id="bayar-grand">Rp 0</span></div>
-        <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;margin-top:16px;">💾 Simpan Pembayaran</button>
+
+        <div class="info-row" style="margin-top:12px;">
+          <span class="lbl">Total Dibayar</span>
+          <span class="val total" id="bayar-grand">Rp 0</span>
+        </div>
+        <button class="btn btn-green" id="btn-simpan-bayar" onclick="simpanPembayaran()" style="width:100%;margin-top:16px;">
+          💾 Simpan Pembayaran
+        </button>
       </div>
     </div>
   </div>
@@ -219,23 +232,24 @@
         <button class="btn btn-primary" onclick="terapkanFilterLaporan()">Tampilkan Laporan</button>
       </div>
     </div>
+
+    <!-- Ringkasan warga -->
     <div class="stat-grid">
-      <div class="stat-box"><div class="stat-label">Total Anggota</div><div class="stat-val blue" id="lap-total">—</div></div>
+      <div class="stat-box"><div class="stat-label">Total Warga</div><div class="stat-val blue" id="lap-total">—</div></div>
       <div class="stat-box"><div class="stat-label">Lunas</div><div class="stat-val green" id="lap-lunas">—</div></div>
       <div class="stat-box"><div class="stat-label">Belum Bayar</div><div class="stat-val red" id="lap-belum">—</div></div>
     </div>
-    <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
+
+    <!-- Ringkasan nominal per jenis iuran -->
+    <div class="stat-grid" style="grid-template-columns: repeat(2, 1fr);">
       <div class="stat-box"><div class="stat-label">💰 Total Kas</div><div class="stat-val sm blue" id="lap-total-kas">—</div></div>
       <div class="stat-box"><div class="stat-label">🏦 Total RMD</div><div class="stat-val sm blue" id="lap-total-rmd">—</div></div>
-      <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val sm green" id="lap-grand-total">—</div></div>
+      <div class="stat-box"><div class="stat-label">🍽️ Total Konsumsi</div><div class="stat-val sm blue" id="lap-total-konsumsi">—</div></div>
+      <div class="stat-box"><div class="stat-label">🎉 Total Dana 17n</div><div class="stat-val sm blue" id="lap-total-dana17n">—</div></div>
     </div>
-    <!--div class="card">
-      <div class="card-header">
-        <span class="card-title">Rincian Transaksi</span>
-        <button class="btn btn-outline btn-small" id="btn-export-belum" onclick="exportBelumBayarExcel()">⬇️ Export Belum Bayar</button>
-      </div>
-      <div class="card-body" id="lap-list"><div class="loading">⏳ Memuat…</div></div>
-    </div-->
+    <div class="stat-grid" style="grid-template-columns: 1fr;">
+      <div class="stat-box"><div class="stat-label">📊 Grand Total</div><div class="stat-val green" id="lap-grand-total">—</div></div>
+    </div>
   </div>
   <nav class="bottom-nav">
     <button class="nav-item" onclick="goPage('dashboard')">🏠 Dashboard</button>
@@ -245,7 +259,7 @@
   </nav>
 </div>
 
-<!-- ══════════════════════════ DETAIL ANGGOTA ════════════════ -->
+<!-- ══════════════════════════ DETAIL WARGA ════════════ -->
 <div class="page" id="pg-detail">
   <div class="topbar">
     <button class="back-btn" onclick="goBack()">← Kembali</button>
